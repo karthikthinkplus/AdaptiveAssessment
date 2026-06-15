@@ -1,0 +1,1 @@
+"""Adaptive assessment backend application."""
