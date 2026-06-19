@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ThinkPlus Adaptive Learning and Assessment Backend
 
 FastAPI backend for ThinkPlus adaptive learning with JWT auth, RBAC, Excel question-bank import, learning sessions, telemetry, BKT mastery tracking, IRT/EAP ability tracking, navigation, Fisher-based question selection, and analytics.
@@ -185,3 +186,6 @@ Additional session endpoints:
 - Improve telemetry heuristics and Fisher/IRT calibration.
 - Add automated test coverage beyond smoke checks.
 - Add production-ready structured logging and request middleware.
+=======
+# AdaptiveAssessment
+>>>>>>> 69571a675a6c2e600094e68b620ec8325c5c05b8
