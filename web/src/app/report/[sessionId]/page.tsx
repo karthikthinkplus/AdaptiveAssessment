@@ -7,6 +7,7 @@ import SimpleBarChart from "@/components/charts/SimpleBarChart";
 import Link from "next/link";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { Download, Share2, LayoutDashboard } from "lucide-react";
+import { api } from "@/lib/api";
 
 const masteryColor = (m: number) => m >= 0.9 ? "var(--success)" : m >= 0.31 ? "var(--warning)" : "var(--danger)";
 
@@ -67,80 +68,140 @@ export default function DiagnosticReport() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setDashboardHref(getDashboardHref());
-      const savedAnswers = localStorage.getItem(`assessment_answers_${sessionId}`) || 
-                           (sessionId === "session-001" || sessionId === "latest" ? localStorage.getItem("assessment_answers") : null);
-      const savedTime = localStorage.getItem(`assessment_time_${sessionId}`) ||
-                        (sessionId === "session-001" || sessionId === "latest" ? localStorage.getItem("assessment_time") : null);
-      
-      let q1Correct = false;
-      let q2Correct = false;
-      let q3Correct = false;
-      let calculatedScore = 82; // Fallback default score for session-001
-      let answeredCount = 3;
-      
-      if (savedAnswers) {
-        const answers = JSON.parse(savedAnswers) as Record<number, string>;
-        q1Correct = answers[0] === "B";
-        q2Correct = answers[1] === "B";
-        q3Correct = answers[2] === "A";
-        answeredCount = [0, 1, 2].filter((index) => Boolean(answers[index])).length;
-        
-        let correctCount = 0;
-        if (q1Correct) correctCount++;
-        if (q2Correct) correctCount++;
-        if (q3Correct) correctCount++;
-        
-        calculatedScore = Math.round((correctCount / 3) * 100);
+      const isMock = sessionId === "session-001" || sessionId === "session-002" || sessionId === "session-003" || sessionId === "latest";
+
+      if (!isMock) {
+        api.get<any>(`/api/v1/analytics/session/${sessionId}`).then((res) => {
+          if (res) {
+            setOverallScore(Math.round(res.accuracy));
+            setGradeEquivalent(
+              res.accuracy >= 90
+                ? "Grade 10 Advanced"
+                : res.accuracy >= 60
+                  ? "Grade 10 Standard"
+                  : "Grade 9 Remedial"
+            );
+            setAnswerOutcomes({
+              correct: res.total_correct,
+              wrong: Math.max(0, res.total_questions_attempted - res.total_correct),
+              guesses: 0,
+            });
+
+            // Fetch the session details to get average time
+            api.get<any>(`/api/v1/learning/sessions/${sessionId}`).then((sess) => {
+              if (sess && sess.total_questions_attempted > 0) {
+                setAverageTimePerQuestion(Math.max(1, Math.round(sess.total_time_seconds / sess.total_questions_attempted)));
+              }
+            }).catch(console.error);
+
+            // Fetch the student's IRT trait or BKT states to populate masteryData
+            const tpUser = sessionStorage.getItem("tp_user");
+            const studentId = tpUser ? JSON.parse(tpUser).id : null;
+            if (studentId) {
+              api.get<any[]>(`/api/v1/adaptive/students/${studentId}/irt`).then((traits) => {
+                if (traits && traits.length > 0) {
+                  const mappedPerformance = traits.map((t: any) => ({
+                    topic: "Mathematics",
+                    score: Math.min(100, Math.max(0, Math.round((t.theta + 3) / 6 * 100)))
+                  }));
+                  setTopicPerformance(mappedPerformance);
+                }
+              }).catch(console.error);
+
+              api.get<any[]>(`/api/v1/adaptive/students/${studentId}/bkt`).then((bkts) => {
+                if (bkts && bkts.length > 0) {
+                  const mappedMastery = bkts.map((b: any) => ({
+                    skill: `Subtopic Mastery`,
+                    topic: "Mathematics",
+                    mastery: b.p_mastery,
+                    label: getMasteryLabel(b.p_mastery)
+                  }));
+                  setMasteryData(mappedMastery);
+                }
+              }).catch(console.error);
+            }
+          }
+        }).catch((err) => {
+          console.error("Failed to load backend session analytics, using default mock fallback", err);
+          loadMockStats();
+        });
       } else {
-        // Fallbacks for direct navigation without taking the test
-        if (sessionId === "session-002") {
-          q1Correct = false; // incorrect (Polynomials)
-          q2Correct = true;  // correct (Speed & Percentage)
-          q3Correct = true;  // correct (Quadratic & Mensuration)
-          calculatedScore = 76;
-        } else {
-          // session-001 or fallback
-          q1Correct = true;
-          q2Correct = true;
-          q3Correct = false;
-          calculatedScore = 82;
-        }
+        loadMockStats();
       }
 
-      // Only show skills for the 3 questions actually tested in the assessment:
-      // Q1 → Polynomial Evaluation (Algebra), Q2 → Speed Distance Time (Arithmetic), Q3 → Quadratic Equations (Algebra)
-      const dynamicSkills: SkillMastery[] = [
-        {
-          skill: "Polynomial Evaluation",
-          topic: "Algebra",
-          mastery: q1Correct ? 0.92 : 0.28,
-          label: q1Correct ? "Mastered" : "Gap",
-        },
-        {
-          skill: "Speed, Distance & Time",
-          topic: "Arithmetic",
-          mastery: q2Correct ? 0.90 : 0.20,
-          label: q2Correct ? "Mastered" : "Gap",
-        },
-        {
-          skill: "Quadratic Equations",
-          topic: "Algebra",
-          mastery: q3Correct ? 0.92 : 0.15,
-          label: q3Correct ? "Mastered" : "Gap",
-        },
-      ];
-      const dynamicTopicPerformance = [
-        {
-          topic: "Algebra",
-          score: Math.round(((q1Correct ? 1 : 0) + (q3Correct ? 1 : 0)) / 2 * 100),
-        },
-        {
-          topic: "Arithmetic",
-          score: q2Correct ? 100 : 0,
-        },
-      ];
+      function loadMockStats() {
+        const savedAnswers = localStorage.getItem(`assessment_answers_${sessionId}`) || 
+                             (sessionId === "session-001" || sessionId === "latest" ? localStorage.getItem("assessment_answers") : null);
+        const savedTime = localStorage.getItem(`assessment_time_${sessionId}`) ||
+                          (sessionId === "session-001" || sessionId === "latest" ? localStorage.getItem("assessment_time") : null);
+        
+        let q1Correct = false;
+        let q2Correct = false;
+        let q3Correct = false;
+        let calculatedScore = 82; // Fallback default score for session-001
+        let answeredCount = 3;
+        
+        if (savedAnswers) {
+          const answers = JSON.parse(savedAnswers) as Record<number, string>;
+          q1Correct = answers[0] === "B";
+          q2Correct = answers[1] === "B";
+          q3Correct = answers[2] === "A";
+          answeredCount = [0, 1, 2].filter((index) => Boolean(answers[index])).length;
+          
+          let correctCount = 0;
+          if (q1Correct) correctCount++;
+          if (q2Correct) correctCount++;
+          if (q3Correct) correctCount++;
+          
+          calculatedScore = Math.round((correctCount / 3) * 100);
+        } else {
+          // Fallbacks for direct navigation without taking the test
+          if (sessionId === "session-002") {
+            q1Correct = false; // incorrect (Polynomials)
+            q2Correct = true;  // correct (Speed & Percentage)
+            q3Correct = true;  // correct (Quadratic & Mensuration)
+            calculatedScore = 76;
+          } else {
+            // session-001 or fallback
+            q1Correct = true;
+            q2Correct = true;
+            q3Correct = false;
+            calculatedScore = 82;
+          }
+        }
 
-      window.setTimeout(() => {
+        // Only show skills for the 3 questions actually tested in the assessment:
+        const dynamicSkills: SkillMastery[] = [
+          {
+            skill: "Polynomial Evaluation",
+            topic: "Algebra",
+            mastery: q1Correct ? 0.92 : 0.28,
+            label: q1Correct ? "Mastered" : "Gap",
+          },
+          {
+            skill: "Speed, Distance & Time",
+            topic: "Arithmetic",
+            mastery: q2Correct ? 0.90 : 0.20,
+            label: q2Correct ? "Mastered" : "Gap",
+          },
+          {
+            skill: "Quadratic Equations",
+            topic: "Algebra",
+            mastery: q3Correct ? 0.92 : 0.15,
+            label: q3Correct ? "Mastered" : "Gap",
+          },
+        ];
+        const dynamicTopicPerformance = [
+          {
+            topic: "Algebra",
+            score: Math.round(((q1Correct ? 1 : 0) + (q3Correct ? 1 : 0)) / 2 * 100),
+          },
+          {
+            topic: "Arithmetic",
+            score: q2Correct ? 100 : 0,
+          },
+        ];
+
         setOverallScore(calculatedScore);
         setGradeEquivalent(
           calculatedScore >= 90
@@ -165,7 +226,7 @@ export default function DiagnosticReport() {
         } else {
           setAverageTimePerQuestion(sessionId === "session-002" ? 68 : 72);
         }
-      }, 0);
+      }
     }
   }, [sessionId]);
 

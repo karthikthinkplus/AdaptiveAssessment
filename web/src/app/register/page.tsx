@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { Eye, EyeOff } from "lucide-react";
-import { MOCK_USERS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -20,46 +20,54 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(false);
-
-    const lowerEmail = email.toLowerCase();
-    
-    // Check dynamic roles in mock database first
-    const matchedUser = MOCK_USERS.find(u => u.email === lowerEmail);
-    if (matchedUser && matchedUser.role !== "student") {
-      const roleName = matchedUser.role === "teacher" ? "Teacher" : matchedUser.role === "qbm" ? "QBM" : "Admin";
-      setError(`This registration page is for students only. To register as a ${roleName}, please use the respective staff registration portal.`);
-      return;
-    }
-    
-    // Suffix/keyword validations fallback for unregistered custom emails
-    if (lowerEmail.includes("teacher")) {
-      setError("This registration page is for students only. To register as a Teacher, please use the Educator Portal.");
-      return;
-    }
-    if (lowerEmail.includes("qbm")) {
-      setError("This registration page is for students only. To register as a QBM, please use the QBM Portal.");
-      return;
-    }
-    if (lowerEmail.includes("admin")) {
-      setError("This registration page is for students only. To register as an Admin, please use the Admin Portal.");
-      return;
-    }
-
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
 
-    // Save session user state
-    const userSession = {
-      name,
-      email: lowerEmail,
-      role: "student",
-      avatar: name.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "ST",
-      institution: "Delhi Public School"
-    };
-    sessionStorage.setItem("tp_user", JSON.stringify(userSession));
-    sessionStorage.setItem("tp_logged_in", "student");
-    router.push("/avatar-setup");
+    const lowerEmail = email.toLowerCase().trim();
+
+    try {
+      // 1. Signup student on backend
+      await api.post("/api/v1/auth/signup/student", {
+        full_name: name,
+        email: lowerEmail,
+        password: password,
+        phone_number: mobile,
+        grade: `Grade ${grade}`,
+        institution_name: "Delhi Public School",
+      });
+
+      // 2. Perform auto-login
+      const loginResponse = await api.post<{
+        access_token: string;
+        token_type: string;
+        user: {
+          id: string;
+          email: string;
+          full_name: string;
+          institution_name: string;
+          avatar_id?: string;
+        };
+        roles: string[];
+      }>("/api/v1/auth/login", { email: lowerEmail, password });
+
+      const role = loginResponse.roles[0]?.toLowerCase() || "student";
+      const userSession = {
+        id: loginResponse.user.id,
+        name: loginResponse.user.full_name,
+        email: loginResponse.user.email,
+        role,
+        avatar: loginResponse.user.avatar_id || "AK",
+        institution: loginResponse.user.institution_name,
+      };
+
+      sessionStorage.setItem("tp_token", loginResponse.access_token);
+      sessionStorage.setItem("tp_user", JSON.stringify(userSession));
+      sessionStorage.setItem("tp_logged_in", role);
+
+      router.push("/avatar-setup");
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please check details and try again.");
+      setLoading(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {

@@ -3,12 +3,22 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { ArrowRight } from "lucide-react";
+import { api } from "@/lib/api";
+
+interface BackendTopic {
+  id: string;
+  name: string;
+  grade?: string;
+  subject?: string;
+}
 
 export default function AssessmentStart() {
   const router = useRouter();
   const [grade, setGrade] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [backendTopics, setBackendTopics] = useState<BackendTopic[]>([]);
+  const [useMock, setUseMock] = useState(false);
   const [authChecked] = useState(() =>
     typeof window !== "undefined" && Boolean(sessionStorage.getItem("tp_logged_in"))
   );
@@ -20,11 +30,30 @@ export default function AssessmentStart() {
     }
   }, [authChecked, router]);
 
+  // Load backend topics
+  useEffect(() => {
+    const fetchTopics = async () => {
+      try {
+        const list = await api.get<BackendTopic[]>("/api/v1/topics");
+        setBackendTopics(list || []);
+        if (!list || list.length === 0) {
+          setUseMock(true);
+        }
+      } catch (err) {
+        console.error("Backend offline or failed to fetch topics. Falling back to local mock data.", err);
+        setUseMock(true);
+      }
+    };
+    if (authChecked) {
+      fetchTopics();
+    }
+  }, [authChecked]);
+
   if (!authChecked) return null;
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!grade) e.grade = "Please select a grade to write the assessment.";
+    if (!grade) e.grade = "Please select a grade/topic to start the assessment.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -33,8 +62,23 @@ export default function AssessmentStart() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    router.push("/assessment/session-001");
+
+    if (grade === "mock-session" || useMock) {
+      await new Promise(r => setTimeout(r, 700));
+      router.push("/assessment/session-001");
+    } else {
+      try {
+        const response = await api.post<{
+          session: { id: string };
+          first_question: any;
+        }>("/api/v1/learning/sessions/start", { topic_id: grade });
+
+        router.push(`/assessment/${response.session.id}`);
+      } catch (err: any) {
+        setErrors({ grade: err.message || "Failed to start learning session on backend." });
+        setLoading(false);
+      }
+    }
   };
 
   return (
@@ -102,10 +146,23 @@ export default function AssessmentStart() {
                   onChange={e => setGrade(e.target.value)}
                   required
                 >
-                  <option value="" disabled>Choose your grade...</option>
-                  <option value="8">Grade 8 (Algebra, Geometry, Arithmetic)</option>
-                  <option value="9">Grade 9 (Number Systems, Polynomials, Statistics)</option>
-                  <option value="10">Grade 10 (Real Numbers, Quadratics, Trigonometry)</option>
+                  <option value="" disabled>Choose a grade or topic...</option>
+                  {!useMock && backendTopics.length > 0 ? (
+                    <>
+                      {backendTopics.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}{t.grade || t.subject ? ` (${[t.grade, t.subject].filter(Boolean).join(" - ")})` : ""}
+                        </option>
+                      ))}
+                      <option value="mock-session">Mock Mode Fallback (Local Data)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="8">Grade 8 (Algebra, Geometry, Arithmetic)</option>
+                      <option value="9">Grade 9 (Number Systems, Polynomials, Statistics)</option>
+                      <option value="10">Grade 10 (Real Numbers, Quadratics, Trigonometry)</option>
+                    </>
+                  )}
                 </select>
                 {errors.grade && <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.375rem" }}>{errors.grade}</p>}
               </div>

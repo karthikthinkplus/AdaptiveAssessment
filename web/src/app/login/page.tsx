@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { Eye, EyeOff } from "lucide-react";
-import { ADMIN_USER_LIST, MOCK_USERS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 
 function LoginForm() {
   const router = useRouter();
@@ -21,47 +21,50 @@ function LoginForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(false);
-
-    const lowerEmail = email.toLowerCase().trim();
-    const matchedUser = MOCK_USERS.find(u => u.email.toLowerCase() === lowerEmail);
-    let role: string | undefined = matchedUser?.role;
-    let matchedAdmin = null;
-
-    if (!role) {
-      const foundAdmin = ADMIN_USER_LIST.find(au => au.email.toLowerCase() === lowerEmail);
-      if (foundAdmin) {
-        role = foundAdmin.role.toLowerCase();
-        matchedAdmin = foundAdmin;
-      }
-    }
-
-    if (!role) {
-      setError("No account found with this email. Please check your credentials.");
-      return;
-    }
-
-    const name = matchedUser?.name || matchedAdmin?.name || "Demo User";
-    const avatar = matchedUser?.avatar || (matchedAdmin?.name ? matchedAdmin.name.split(" ").map((n: string) => n[0]).join("") : "DU");
-    const institution = matchedUser?.institution || matchedAdmin?.institution || "Delhi Public School";
-
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
 
-    const userSession = { name, email: lowerEmail, role, avatar, institution };
-    sessionStorage.setItem("tp_user", JSON.stringify(userSession));
-    sessionStorage.setItem("tp_logged_in", role);
+    try {
+      const response = await api.post<{
+        access_token: string;
+        token_type: string;
+        user: {
+          id: string;
+          email: string;
+          full_name: string;
+          institution_name: string;
+          avatar_id?: string;
+        };
+        roles: string[];
+      }>("/api/v1/auth/login", { email, password });
 
-    if (role === "student") {
-      router.push(nextParam === "assessment" ? "/assessment/start" : "/student/dashboard");
-    } else if (role === "teacher") {
-      router.push("/teacher/dashboard");
-    } else if (role === "qbm") {
-      router.push("/qbm/dashboard");
-    } else if (role === "admin") {
-      router.push("/admin/dashboard");
-    } else {
-      setError("Unrecognized user role. Contact system administrator.");
+      const role = response.roles[0]?.toLowerCase() || "student";
+      const userSession = {
+        id: response.user.id,
+        name: response.user.full_name,
+        email: response.user.email,
+        role,
+        avatar: response.user.avatar_id || "AK",
+        institution: response.user.institution_name,
+      };
+
+      sessionStorage.setItem("tp_token", response.access_token);
+      sessionStorage.setItem("tp_user", JSON.stringify(userSession));
+      sessionStorage.setItem("tp_logged_in", role);
+
+      if (role === "student") {
+        router.push(nextParam === "assessment" ? "/assessment/start" : "/student/dashboard");
+      } else if (role === "teacher") {
+        router.push("/teacher/dashboard");
+      } else if (role === "qbm" || role === "content_manager") {
+        router.push("/qbm/dashboard");
+      } else if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else {
+        setError("Unrecognized user role. Contact system administrator.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password.");
       setLoading(false);
     }
   };

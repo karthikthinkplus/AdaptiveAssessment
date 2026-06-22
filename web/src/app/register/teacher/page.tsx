@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { Mail, Lock, User, ArrowRight, School, Eye, EyeOff, Phone } from "lucide-react";
-import { MOCK_USERS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 
 export default function TeacherRegisterPage() {
   const router = useRouter();
@@ -22,32 +22,55 @@ export default function TeacherRegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(false);
+    setLoading(true);
 
     const lowerEmail = email.toLowerCase().trim();
 
-    const matchedUser = MOCK_USERS.find(u => u.email.toLowerCase() === lowerEmail);
-    if (matchedUser && matchedUser.role !== "teacher") {
-      const roleName = matchedUser.role === "student" ? "Student" : "Admin";
-      setError(`This email is already registered under the ${roleName} role. Please use a different email.`);
-      return;
+    try {
+      // 1. Sign up on backend
+      await api.post("/api/v1/auth/signup/teacher", {
+        full_name: name,
+        email: lowerEmail,
+        password: password,
+        phone_number: mobile,
+        institution_name: institution || "Delhi Public School",
+        department: specialization,
+        designation: "Educator",
+      });
+
+      // 2. Auto-login
+      const loginResponse = await api.post<{
+        access_token: string;
+        token_type: string;
+        user: {
+          id: string;
+          email: string;
+          full_name: string;
+          institution_name: string;
+          avatar_id?: string;
+        };
+        roles: string[];
+      }>("/api/v1/auth/login", { email: lowerEmail, password });
+
+      const role = loginResponse.roles[0]?.toLowerCase() || "teacher";
+      const userSession = {
+        id: loginResponse.user.id,
+        name: loginResponse.user.full_name,
+        email: loginResponse.user.email,
+        role,
+        avatar: loginResponse.user.avatar_id || name.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "TH",
+        institution: loginResponse.user.institution_name,
+      };
+
+      sessionStorage.setItem("tp_token", loginResponse.access_token);
+      sessionStorage.setItem("tp_user", JSON.stringify(userSession));
+      sessionStorage.setItem("tp_logged_in", role);
+
+      router.push("/teacher/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please check details and try again.");
+      setLoading(false);
     }
-
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-
-    // Save session user state
-    const userSession = {
-      name,
-      email: lowerEmail,
-      role: "teacher",
-      avatar: name.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "TH",
-      institution: institution || "Delhi Public School"
-    };
-    sessionStorage.setItem("tp_user", JSON.stringify(userSession));
-    sessionStorage.setItem("tp_logged_in", "teacher");
-
-    router.push("/teacher/dashboard");
   };
 
   const handleGoogleAuth = async () => {
