@@ -1,10 +1,25 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
-import { SAMPLE_QUESTIONS, type Question } from "@/lib/mockData";
 import { Search, Trash, Edit, Plus, BookOpen } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 type Difficulty = "very_easy" | "easy" | "medium" | "hard" | "very_hard";
+
+interface Question {
+  id: string;
+  index: number;
+  totalQuestions: number;
+  text: string;
+  options: { key: "A" | "B" | "C" | "D"; text: string }[];
+  skillBreadcrumb: { topic: string; skill: string };
+  grade: number;
+  difficulty: Difficulty;
+  wordProblem: boolean;
+  status: string;
+  topic_id?: string;
+  subtopic_id?: string;
+}
 
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "very_easy", label: "Very Easy" },
@@ -18,8 +33,9 @@ const difficultyLabel = (difficulty: Difficulty) =>
   DIFFICULTY_OPTIONS.find(option => option.value === difficulty)?.label || difficulty;
 
 const difficultyBadgeClass = (difficulty: Difficulty) => {
-  if (difficulty === "very_easy" || difficulty === "easy") return "tp-badge-success";
-  if (difficulty === "medium") return "tp-badge-warning";
+  const diff = difficulty?.toLowerCase();
+  if (diff === "very_easy" || diff === "easy") return "tp-badge-success";
+  if (diff === "medium") return "tp-badge-warning";
   return "tp-badge-danger";
 };
 
@@ -27,73 +43,166 @@ export default function QBMQuestionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("");
-  const [questions, setQuestions] = useState(SAMPLE_QUESTIONS);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   
   const [newQuestionText, setNewQuestionText] = useState("");
-  const [newTopic, setNewTopic] = useState("Algebra");
+  const [newTopic, setNewTopic] = useState("");
+  const [newSubtopic, setNewSubtopic] = useState("");
+  const [subtopics, setSubtopics] = useState<any[]>([]);
   const [newDifficulty, setNewDifficulty] = useState<Difficulty>("easy");
   const [optA, setOptA] = useState("");
   const [optB, setOptB] = useState("");
   const [optC, setOptC] = useState("");
   const [optD, setOptD] = useState("");
+  const [correctOpt, setCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
 
-  const handleSaveQuestion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingQuestion) {
-      const updated = questions.map(q => {
-        if (q.id === editingQuestion.id) {
-          return {
-            ...q,
-            text: newQuestionText,
-            skillBreadcrumb: { topic: newTopic, skill: q.skillBreadcrumb.skill },
-            difficulty: newDifficulty,
-            options: [
-              { key: "A" as const, text: optA },
-              { key: "B" as const, text: optB },
-              { key: "C" as const, text: optC },
-              { key: "D" as const, text: optD }
-            ]
-          };
-        }
-        return q;
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const topicsList = await api.get<any[]>("/api/v1/topics");
+      setTopics(topicsList || []);
+      
+      const questionsList = await api.get<any[]>("/api/v1/questions");
+
+      const topicsMap: Record<string, string> = {};
+      topicsList.forEach(t => {
+        topicsMap[t.id] = t.name;
       });
-      setQuestions(updated);
-    } else {
-      const newQ = {
-        id: `q${questions.length + 1}`,
-        index: questions.length + 1,
-        totalQuestions: questions.length + 1,
-        text: newQuestionText,
-        options: [
-          { key: "A" as const, text: optA },
-          { key: "B" as const, text: optB },
-          { key: "C" as const, text: optC },
-          { key: "D" as const, text: optD }
-        ],
-        skillBreadcrumb: { topic: newTopic, skill: "General Assessment" },
-        grade: 10,
-        difficulty: newDifficulty,
-        wordProblem: false
-      };
-      setQuestions([...questions, newQ]);
+
+      const activeQuestions = (questionsList || []).filter((q: any) => q.status !== "archived");
+
+      const mapped: Question[] = activeQuestions.map((q: any, idx: number) => {
+        const optMapped = (q.options || []).map((o: any) => ({
+          key: o.option_label as "A" | "B" | "C" | "D",
+          text: o.option_text
+        }));
+        return {
+          id: q.id,
+          index: idx + 1,
+          totalQuestions: activeQuestions.length,
+          text: q.question_text,
+          options: optMapped,
+          skillBreadcrumb: {
+            topic: topicsMap[q.topic_id] || "Mathematics",
+            skill: q.question_code || "General"
+          },
+          grade: 10,
+          difficulty: (q.difficulty_level?.toLowerCase() || "easy") as Difficulty,
+          wordProblem: false,
+          status: q.status,
+          topic_id: q.topic_id,
+          subtopic_id: q.subtopic_id
+        };
+      });
+      setQuestions(mapped);
+    } catch (err) {
+      console.error("Failed to load questions from backend", err);
+    } finally {
+      setLoading(false);
     }
-    setIsModalOpen(false);
-    setEditingQuestion(null);
-    setNewQuestionText("");
-    setOptA("");
-    setOptB("");
-    setOptC("");
-    setOptD("");
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Fetch subtopics when the selected topic in the modal changes
+  useEffect(() => {
+    if (newTopic) {
+      api.get<any[]>(`/api/v1/topics/${newTopic}/subtopics`)
+        .then(list => {
+          setSubtopics(list || []);
+          if (list && list.length > 0) {
+            // Match subtopic if editing
+            if (editingQuestion && list.some(s => s.id === editingQuestion.subtopic_id)) {
+              setNewSubtopic(editingQuestion.subtopic_id || list[0].id);
+            } else {
+              setNewSubtopic(list[0].id);
+            }
+          } else {
+            setNewSubtopic("");
+          }
+        })
+        .catch(err => {
+          console.error("Failed to load subtopics", err);
+          setSubtopics([]);
+          setNewSubtopic("");
+        });
+    } else {
+      setSubtopics([]);
+      setNewSubtopic("");
+    }
+  }, [newTopic, editingQuestion]);
+
+  const handleSaveQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const optionsPayload = [
+        { option_label: "A", option_text: optA, is_correct: correctOpt === "A", display_order: 0 },
+        { option_label: "B", option_text: optB, is_correct: correctOpt === "B", display_order: 1 },
+        { option_label: "C", option_text: optC, is_correct: correctOpt === "C", display_order: 2 },
+        { option_label: "D", option_text: optD, is_correct: correctOpt === "D", display_order: 3 }
+      ];
+
+      if (editingQuestion) {
+        // Prepare PATCH payload
+        const payload = {
+          topic_id: newTopic,
+          subtopic_id: newSubtopic || null,
+          question_text: newQuestionText,
+          difficulty_level: newDifficulty,
+          correct_answer: correctOpt
+        };
+        await api.patch(`/api/v1/questions/${editingQuestion.id}`, payload);
+      } else {
+        // Prepare POST payload
+        const payload = {
+          topic_id: newTopic,
+          subtopic_id: newSubtopic || null,
+          question_text: newQuestionText,
+          difficulty_level: newDifficulty,
+          question_type: "mcq",
+          options: optionsPayload,
+          correct_answer: correctOpt,
+          status: "approved"
+        };
+        await api.post("/api/v1/questions", payload);
+      }
+
+      await loadData();
+      setIsModalOpen(false);
+      setEditingQuestion(null);
+      setNewQuestionText("");
+      setOptA("");
+      setOptB("");
+      setOptC("");
+      setOptD("");
+    } catch (err: any) {
+      alert("Failed to save question: " + err.message);
+    }
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    if (confirm("Are you sure you want to delete this question?")) {
+      try {
+        await api.patch(`/api/v1/questions/${id}`, { status: "archived" });
+        await loadData();
+      } catch (err: any) {
+        alert("Failed to delete question: " + err.message);
+      }
+    }
   };
 
   const filtered = questions.filter(q => {
     const matchesSearch = q.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           q.skillBreadcrumb.topic.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTopic = !selectedTopic || q.skillBreadcrumb.topic === selectedTopic;
+    const matchesTopic = !selectedTopic || q.topic_id === selectedTopic;
     const matchesDifficulty = !selectedDifficulty || q.difficulty === selectedDifficulty;
     return matchesSearch && matchesTopic && matchesDifficulty;
   });
@@ -106,12 +215,17 @@ export default function QBMQuestionsPage() {
           onClick={() => {
             setEditingQuestion(null);
             setNewQuestionText("");
-            setNewTopic("Algebra");
+            if (topics.length > 0) {
+              setNewTopic(topics[0].id);
+            } else {
+              setNewTopic("");
+            }
             setNewDifficulty("easy");
             setOptA("");
             setOptB("");
             setOptC("");
             setOptD("");
+            setCorrectOpt("A");
             setIsModalOpen(true);
           }} 
           className="tp-btn-primary" 
@@ -129,25 +243,25 @@ export default function QBMQuestionsPage() {
             type="text"
             className="tp-input"
             style={{ paddingLeft: "2.5rem" }}
-            placeholder="Search questions by text or topic..."
+            placeholder="Search questions by text..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <select 
           className="tp-select" 
-          style={{ width: 150 }}
+          style={{ width: 200 }}
           value={selectedTopic}
           onChange={e => setSelectedTopic(e.target.value)}
         >
           <option value="">All Topics</option>
-          <option value="Algebra">Algebra</option>
-          <option value="Arithmetic">Arithmetic</option>
-          <option value="Geometry">Geometry</option>
+          {topics.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
         </select>
         <select 
           className="tp-select" 
-          style={{ width: 150 }}
+          style={{ width: 180 }}
           value={selectedDifficulty}
           onChange={e => setSelectedDifficulty(e.target.value)}
         >
@@ -160,55 +274,62 @@ export default function QBMQuestionsPage() {
 
       {/* ── Questions List ───────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {filtered.map((q, idx) => (
-          <div key={q.id} className="tp-card animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                <span className="tp-badge tp-badge-neutral"><BookOpen size={12} style={{ marginRight: 2 }} /> {q.skillBreadcrumb.topic}</span>
-                <span className="tp-badge tp-badge-neutral">{q.skillBreadcrumb.skill}</span>
-                <span className={`tp-badge ${difficultyBadgeClass(q.difficulty)}`}>{difficultyLabel(q.difficulty)}</span>
-              </div>
-              <div style={{ display: "flex", gap: "0.35rem" }}>
-                <button 
-                  onClick={() => {
-                    setEditingQuestion(q);
-                    setNewQuestionText(q.text);
-                    setNewTopic(q.skillBreadcrumb.topic);
-                    setNewDifficulty(q.difficulty);
-                    setOptA(q.options[0]?.text || "");
-                    setOptB(q.options[1]?.text || "");
-                    setOptC(q.options[2]?.text || "");
-                    setOptD(q.options[3]?.text || "");
-                    setIsModalOpen(true);
-                  }}
-                  className="tp-btn-ghost" 
-                  style={{ padding: "0.35rem", borderRadius: "6px" }} 
-                  title="Edit"
-                >
-                  <Edit size={14} />
-                </button>
-                <button onClick={() => setQuestions(questions.filter(item => item.id !== q.id))} className="tp-btn-ghost" style={{ padding: "0.35rem", borderRadius: "6px", color: "var(--danger)" }} title="Delete">
-                  <Trash size={14} />
-                </button>
-              </div>
-            </div>
-            <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9375rem", lineHeight: 1.5, marginBottom: "1rem" }}>
-              {q.text}
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-              {q.options.map(opt => (
-                <div key={opt.key} style={{ display: "flex", gap: "0.5rem", padding: "0.5rem 0.75rem", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "0.8125rem", background: "var(--surface)" }}>
-                  <strong style={{ color: "var(--primary)" }}>{opt.key}:</strong>
-                  <span>{opt.text}</span>
-                </div>
-              ))}
-            </div>
+        {loading ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+            Loading Question Bank...
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-muted)" }}>
             No questions found matching your filter selections.
           </div>
+        ) : (
+          filtered.map((q, idx) => (
+            <div key={q.id} className="tp-card animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <span className="tp-badge tp-badge-neutral"><BookOpen size={12} style={{ marginRight: 2 }} /> {q.skillBreadcrumb.topic}</span>
+                  <span className="tp-badge tp-badge-neutral">{q.skillBreadcrumb.skill}</span>
+                  <span className={`tp-badge ${difficultyBadgeClass(q.difficulty)}`}>{difficultyLabel(q.difficulty)}</span>
+                </div>
+                <div style={{ display: "flex", gap: "0.35rem" }}>
+                  <button 
+                    onClick={() => {
+                      setEditingQuestion(q);
+                      setNewQuestionText(q.text);
+                      setNewTopic(q.topic_id || "");
+                      setNewDifficulty(q.difficulty);
+                      setOptA(q.options[0]?.text || "");
+                      setOptB(q.options[1]?.text || "");
+                      setOptC(q.options[2]?.text || "");
+                      setOptD(q.options[3]?.text || "");
+                      const backendCorrectLabel = q.options.find((o: any) => o.is_correct)?.key || "A";
+                      setCorrectOpt(backendCorrectLabel);
+                      setIsModalOpen(true);
+                    }}
+                    className="tp-btn-ghost" 
+                    style={{ padding: "0.35rem", borderRadius: "6px" }} 
+                    title="Edit"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDeleteQuestion(q.id)} className="tp-btn-ghost" style={{ padding: "0.35rem", borderRadius: "6px", color: "var(--danger)" }} title="Delete">
+                    <Trash size={14} />
+                  </button>
+                </div>
+              </div>
+              <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9375rem", lineHeight: 1.5, marginBottom: "1rem" }}>
+                {q.text}
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                {q.options.map(opt => (
+                  <div key={opt.key} style={{ display: "flex", gap: "0.5rem", padding: "0.5rem 0.75rem", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "0.8125rem", background: "var(--surface)" }}>
+                    <strong style={{ color: "var(--primary)" }}>{opt.key}:</strong>
+                    <span>{opt.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
 
@@ -227,18 +348,41 @@ export default function QBMQuestionsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
                   <label style={{ fontSize: "0.8125rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>Topic</label>
-                  <select className="tp-select" value={newTopic} onChange={e => setNewTopic(e.target.value)}>
-                    <option value="Algebra">Algebra</option>
-                    <option value="Arithmetic">Arithmetic</option>
-                    <option value="Geometry">Geometry</option>
+                  <select className="tp-select" value={newTopic} onChange={e => setNewTopic(e.target.value)} required>
+                    {topics.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
                   </select>
                 </div>
+                <div>
+                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>Subtopic</label>
+                  <select className="tp-select" value={newSubtopic} onChange={e => setNewSubtopic(e.target.value)} required>
+                    {subtopics.length === 0 ? (
+                      <option value="">No subtopics</option>
+                    ) : (
+                      subtopics.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
                   <label style={{ fontSize: "0.8125rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>Difficulty</label>
                   <select className="tp-select" value={newDifficulty} onChange={e => setNewDifficulty(e.target.value as Difficulty)}>
                     {DIFFICULTY_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>Correct Option</label>
+                  <select className="tp-select" value={correctOpt} onChange={e => setCorrectOpt(e.target.value as any)}>
+                    <option value="A">Option A</option>
+                    <option value="B">Option B</option>
+                    <option value="C">Option C</option>
+                    <option value="D">Option D</option>
                   </select>
                 </div>
               </div>
@@ -261,7 +405,7 @@ export default function QBMQuestionsPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="tp-btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>Cancel</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingQuestion(null); }} className="tp-btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>Cancel</button>
                 <button type="submit" className="tp-btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>
                   {editingQuestion ? "Save Changes" : "Add Question"}
                 </button>

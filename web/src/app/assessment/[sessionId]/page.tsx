@@ -127,6 +127,20 @@ export default function AssessmentPlayer() {
           const tpUser = sessionStorage.getItem("tp_user");
           const userId = tpUser ? JSON.parse(tpUser).id : null;
           await api.post(`/api/v1/learning/sessions/${sessionId}/end`);
+
+          if (userId) {
+            try {
+              const key = `completed_sessions_${userId}`;
+              const completed = JSON.parse(localStorage.getItem(key) || "[]");
+              if (!completed.includes(sessionId)) {
+                completed.push(sessionId);
+                localStorage.setItem(key, JSON.stringify(completed));
+              }
+            } catch (e) {
+              console.error("Failed to save completed session ID", e);
+            }
+          }
+
           router.push(`/report/${sessionId}`);
         }
       } catch (err) {

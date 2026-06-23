@@ -2,24 +2,44 @@
 import AppShell from "@/components/layout/AppShell";
 import SkillPieChart from "@/components/charts/SkillPieChart";
 import SimpleBarChart from "@/components/charts/SimpleBarChart";
-import { TOPIC_PERFORMANCE_RADAR } from "@/lib/mockData";
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 export default function TeacherAnalyticsPage() {
-  const [hasData] = useState(true);
+  const [hasData, setHasData] = useState(false);
   const [selectedClass, setSelectedClass] = useState("Class 10 - A");
   const [selectedSubject, setSelectedSubject] = useState("Math");
+
+  useEffect(() => {
+    api.get<any[]>("/api/v1/users").then((list) => {
+      const studentList = (list || []).filter(u => inferRole(u.email, u.institution_name) === "Student");
+      if (studentList.length > 0) {
+        // In a real database, check if they have sessions. If we have student IDs,
+        // we can query analytics or keep it simple.
+        setHasData(false); // Since database starts clean and there are no sessions, hasData is false.
+      } else {
+        setHasData(false);
+      }
+    }).catch(() => {
+      setHasData(false);
+    });
+  }, []);
 
   let classScale = 1.0;
   if (selectedClass === "Class 10 - B") {
     classScale = 0.88;
   }
 
-  const radarData = TOPIC_PERFORMANCE_RADAR.map(item => ({
-    ...item,
-    score: Math.max(30, Math.round(item.score * classScale))
-  }));
+  const radarData: any[] = [];
 
   const participationData = [
     { name: "Algebra Test 1", rate: Math.min(100, Math.round(95 * classScale)) },

@@ -1,5 +1,4 @@
 "use client";
-import { RADAR_DATA } from "@/lib/mockData";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 interface SkillPieChartProps {
@@ -10,9 +9,17 @@ interface SkillPieChartProps {
 // Muted pastel palette — softer on the eye
 const COLORS = ["#E8A0C4", "#7DC5E0", "#85CFA1", "#E8D080", "#F0B8AC", "#C4B0F0"];
 
-export default function SkillPieChart({ data = RADAR_DATA, height = 200 }: SkillPieChartProps) {
+export default function SkillPieChart({ data = [], height = 200 }: SkillPieChartProps) {
   const strengths  = data.filter(d => d.score >= 70);
   const weaknesses = data.filter(d => d.score <  70);
+
+  if (data.length === 0) {
+    return (
+      <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed var(--border)", borderRadius: 12, color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+        No analytics data available.
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>

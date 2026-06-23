@@ -20,7 +20,6 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Dashboard",    href: "/student/dashboard",          icon: <LayoutDashboard size={18} /> },
     { label: "Reports",      href: "/report",      icon: <FileText size={18} /> },
     { label: "Profile",      href: "/profile",            icon: <User size={18} /> },
-    { label: "Notifications",href: "/notifications",      icon: <Bell size={18} /> },
   ],
   teacher: [
     { label: "Dashboard",  href: "/teacher/dashboard",  icon: <LayoutDashboard size={18} /> },
@@ -36,7 +35,6 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Curriculum Map", href: "/qbm/curriculum", icon: <Network size={18} /> },
     { label: "Bulk Upload",   href: "/qbm/upload",     icon: <Upload size={18} /> },
     { label: "Profile",       href: "/profile",        icon: <User size={18} /> },
-    { label: "Notifications", href: "/notifications",  icon: <Bell size={18} /> },
   ],
   admin: [
     { label: "Dashboard",    href: "/admin/dashboard",     icon: <LayoutDashboard size={18} /> },

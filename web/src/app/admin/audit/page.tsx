@@ -1,14 +1,10 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
 import { Terminal } from "lucide-react";
+import { useState } from "react";
 
 export default function AdminAuditPage() {
-  const logs = [
-    { id: "L901", action: "Settings Update", user: "Admin User (Admin)", target: "requireEmailVerification -> true", ip: "192.168.1.45", time: "Jun 17, 2026 17:10" },
-    { id: "L902", action: "User Deactivation", user: "Admin User (Admin)", target: "student:sunita@example.com", ip: "192.168.1.45", time: "Jun 17, 2026 16:30" },
-    { id: "L903", action: "Bulk Question Upload", user: "Ravi Kumar (QBM)", target: "Question Bank [Math: 25 items]", ip: "192.168.1.12", time: "Jun 17, 2026 15:45" },
-    { id: "L904", action: "Institution Registration", user: "Admin User (Admin)", target: "Institution [Delhi Public School]", ip: "192.168.1.45", time: "Jun 16, 2026 11:20" },
-  ];
+  const [logs, setLogs] = useState<any[]>([]);
 
   return (
     <AppShell title="System Audit Logs">
@@ -40,6 +36,13 @@ export default function AdminAuditPage() {
                 <td>{log.time}</td>
               </tr>
             ))}
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)", padding: "2.5rem" }}>
+                  No system audit events logged yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

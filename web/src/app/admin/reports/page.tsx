@@ -1,43 +1,33 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
-import { STUDENT_LIST } from "@/lib/mockData";
 import { Search, Eye, Download, FileText } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 export default function AdminReportsPage() {
   const [search, setSearch] = useState("");
   const [selectedInst, setSelectedInst] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [exportedReport, setExportedReport] = useState("");
+  const [adminStudentReports, setAdminStudentReports] = useState<any[]>([]);
 
-  // Map students to mock institutions and grades to show global platform data
-  const adminStudentReports = STUDENT_LIST.map((student, index) => {
-    const institutions = [
-      "Delhi Public School",
-      "St. Xavier's School",
-      "DAV Public School",
-      "Ryan International School",
-      "Kendriya Vidyalaya Bangalore",
-      "Amity International"
-    ];
-    const grades = [
-      "Class 10 - A",
-      "Class 9 - B",
-      "Class 10 - B",
-      "Class 9 - A"
-    ];
-    
-    return {
-      ...student,
-      institution: institutions[index % institutions.length],
-      grade: grades[index % grades.length],
-      assessmentName: index % 2 === 0 ? "Math Adaptive Test" : "Number Theory Quiz",
-      subject: index % 2 === 0 ? "Algebra" : "Arithmetic",
-      completedDate: "May 12, 2026",
-      sessionId: index % 2 === 0 ? "session-001" : "session-002"
-    };
-  });
+  useEffect(() => {
+    api.get<any[]>("/api/v1/users").then((list) => {
+      // In clean database state, keep it empty. If there were real student assessments, we can list them.
+      setAdminStudentReports([]);
+    }).catch((err) => {
+      console.error("Failed to load users for reports list", err);
+    });
+  }, []);
 
   const filtered = adminStudentReports.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());

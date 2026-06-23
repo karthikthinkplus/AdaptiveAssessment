@@ -1,74 +1,157 @@
 "use client";
-import AppShell from "@/components/layout/AppShell";
-import SimpleBarChart from "@/components/charts/SimpleBarChart";
-import {
-  STUDENT_STATS,
-  TOPIC_STRENGTH, RECENT_ASSESSMENT, ASSESSMENTS
-} from "@/lib/mockData";
+
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import Link from "next/link";
 import { ArrowRight, Eye, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
 
 export default function StudentDashboard() {
-  // Demo states to show empty states if required
-  const [hasAssessments] = useState(true);
-
+  const [hasAssessments, setHasAssessments] = useState(false);
   const [stats, setStats] = useState({
-    completedCount: ASSESSMENTS.filter(a => a.score !== undefined).length,
-    avgScore: `${STUDENT_STATS.averageScore}%`,
-    masteredCount: STUDENT_STATS.masteredTopics.value,
-    opportunitiesCount: 4,
-    recentAssessmentScore: RECENT_ASSESSMENT.score,
+    completedCount: 0,
+    avgScore: "0%",
+    masteredCount: 0,
+    opportunitiesCount: 10,
+    recentAssessmentScore: 0,
   });
+  const [topicStrengths, setTopicStrengths] = useState<any[]>([]);
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [recentTest, setRecentTest] = useState<{ name: string; date: string; questions: number } | null>(null);
+  const [userName, setUserName] = useState("Student");
+  const [userAvatar, setUserAvatar] = useState("S");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("current_role", "student");
-      const savedAnswers = localStorage.getItem("assessment_answers_session-001") || localStorage.getItem("assessment_answers");
-      if (savedAnswers) {
-        const answers = JSON.parse(savedAnswers) as Record<number, string>;
-        const q1Correct = answers[0] === "B";
-        const q2Correct = answers[1] === "B";
-        const q3Correct = answers[2] === "A";
-        
-        let correctCount = 0;
-        if (q1Correct) correctCount++;
-        if (q2Correct) correctCount++;
-        if (q3Correct) correctCount++;
-        
-        const calculatedScore = Math.round((correctCount / 3) * 100);
-        const totalScore = 76 + calculatedScore; // 76 from existing session-002
-        const totalCompleted = 2;
-        const computedAvg = Math.round(totalScore / totalCompleted);
-        
-        let newMastered = 0;
-        if (q1Correct) newMastered += 2; // Linear & Polynomial
-        if (q3Correct) newMastered += 1; // Quadratic
-        if (q2Correct) newMastered += 1; // Speed
-        if (calculatedScore >= 75) newMastered += 1; // Data Interpretation
-        
-        const computedMastered = 12 + newMastered;
-        
-        window.setTimeout(() => {
-          setStats({
-            completedCount: totalCompleted,
-            avgScore: `${computedAvg}%`,
-            masteredCount: computedMastered,
-            opportunitiesCount: 8 - newMastered,
-            recentAssessmentScore: calculatedScore,
-          });
-        }, 0);
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+
+      if (user) {
+        setUserName(user.name || "Student");
+        setUserAvatar(user.avatar || "S");
+      }
+
+      const fetchAnalytics = (studentId: string, topicsMap: Map<string, string>) => {
+        api.get<any>(`/api/v1/analytics/student/${studentId}`).then((res) => {
+          if (res) {
+            const sessionsCount = res.total_sessions || 0;
+            setHasAssessments(sessionsCount > 0);
+
+            let mastered = 0;
+            if (res.mastery_distribution) {
+              mastered = Object.values(res.mastery_distribution).reduce((a: any, b: any) => a + b, 0) as number;
+            }
+
+            setStats({
+              completedCount: sessionsCount,
+              avgScore: `${Math.round(res.accuracy)}%`,
+              masteredCount: mastered,
+              opportunitiesCount: Math.max(0, 10 - mastered),
+              recentAssessmentScore: Math.round(res.accuracy),
+            });
+
+            if (res.latest_theta_by_topic) {
+              const strengths = Object.entries(res.latest_theta_by_topic).map(([topicId, theta]: any) => ({
+                topic: topicsMap.get(topicId) || "Mathematics",
+                score: Math.min(100, Math.max(0, Math.round((theta + 3) / 6 * 100)))
+              }));
+              setTopicStrengths(strengths);
+            }
+          }
+        }).catch((err) => {
+          console.error("Failed to load student analytics from API", err);
+          loadMockDashboard();
+        });
+      };
+
+      api.get<any[]>("/api/v1/topics").then((topicsList) => {
+        const topicsMap = new Map((topicsList || []).map(t => [t.id, t.name]));
+
+        if (user && user.id) {
+          const completedKey = `completed_sessions_${user.id}`;
+          const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
+          if (sessionIds.length > 0) {
+            // Load recent test info
+            api.get<any>(`/api/v1/learning/sessions/${sessionIds[0]}`).then((sess) => {
+              if (sess) {
+                const topicName = topicsMap.get(sess.topic_id) || "Adaptive Assessment";
+                const dateStr = new Date(sess.completed_at || sess.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric"
+                });
+                setRecentTest({
+                  name: topicName,
+                  date: dateStr,
+                  questions: sess.total_questions_attempted || 15
+                });
+
+                // Load student profile & analytics
+                if (sess.student_id) {
+                  user.student_id = sess.student_id;
+                  sessionStorage.setItem("tp_user", JSON.stringify(user));
+                  fetchAnalytics(sess.student_id, topicsMap);
+                } else {
+                  loadMockDashboard();
+                }
+              } else {
+                loadMockDashboard();
+              }
+            }).catch((err) => {
+              console.error("Failed to fetch session details", err);
+              loadMockDashboard();
+            });
+
+            // Load performance trends list
+            Promise.all(sessionIds.slice(0, 5).map(async (sessId) => {
+              try {
+                const sDetail = await api.get<any>(`/api/v1/learning/sessions/${sessId}`);
+                const sAnalytics = await api.get<any>(`/api/v1/analytics/session/${sessId}`);
+                return {
+                  assessment: topicsMap.get(sDetail.topic_id) || "Test",
+                  score: Math.round(sAnalytics.accuracy)
+                };
+              } catch {
+                return null;
+              }
+            })).then((chartDataList) => {
+              setPerformanceData(chartDataList.filter(Boolean) as any[]);
+            });
+
+          } else {
+            loadMockDashboard();
+          }
+        } else {
+          loadMockDashboard();
+        }
+      }).catch((err) => {
+        console.error("Failed to load topics", err);
+        loadMockDashboard();
+      });
+
+      function loadMockDashboard() {
+        setHasAssessments(false);
+        setStats({
+          completedCount: 0,
+          avgScore: "0%",
+          masteredCount: 0,
+          opportunitiesCount: 10,
+          recentAssessmentScore: 0,
+        });
+        setTopicStrengths([]);
+        setPerformanceData([]);
+        setRecentTest(null);
       }
     }
   }, []);
 
   return (
-    <AppShell role="student" userName="Arjun Kumar" userAvatar="AK" title="Student Dashboard">
+    <AppShell role="student" userName={userName} userAvatar={userAvatar} title="Student Dashboard">
       {/* ── Header Area ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ fontSize: "1.375rem", fontWeight: 700 }}>
-            Welcome Back, Arjun Kumar
+            Welcome Back, {userName}
           </h1>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -111,10 +194,12 @@ export default function StudentDashboard() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Recent Assessment</div>
-                  <div style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{RECENT_ASSESSMENT.name}</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                    {RECENT_ASSESSMENT.date} · {RECENT_ASSESSMENT.questions} Questions
-                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{recentTest?.name || "Adaptive Assessment"}</div>
+                  {recentTest && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                      {recentTest.date} · {recentTest.questions} Questions
+                    </div>
+                  )}
                 </div>
                 <Link href="/report/latest" style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem", color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
                   <Eye size={12} /> View Report
@@ -140,10 +225,8 @@ export default function StudentDashboard() {
             <div className="tp-card">
               <div style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "1rem" }}>Performance Overview</div>
               <SimpleBarChart
-                data={[
-                  { assessment: "Math Test", score: stats.recentAssessmentScore },
-                  { assessment: "Number Quiz", score: 76 },
-                  { assessment: "Chemistry", score: 85 },
+                data={performanceData.length > 0 ? performanceData : [
+                  { assessment: "Recent", score: stats.recentAssessmentScore }
                 ]}
                 xKey="assessment"
                 bars={[
@@ -157,7 +240,7 @@ export default function StudentDashboard() {
             <div className="tp-card">
               <div style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "1rem" }}>Topic Strength</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-                {TOPIC_STRENGTH.map((t) => (
+                {topicStrengths.map((t) => (
                   <div key={t.topic}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
                       <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{t.topic}</span>

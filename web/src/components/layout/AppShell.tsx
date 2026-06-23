@@ -15,6 +15,14 @@ interface AppShellProps {
   title?: string;
 }
 
+const normalizeRole = (role: string): Role => {
+  const r = role?.toLowerCase();
+  if (r === "content_manager" || r === "qbm") return "qbm";
+  if (r === "teacher") return "teacher";
+  if (r === "admin") return "admin";
+  return "student";
+};
+
 export default function AppShell({ children, role: propRole = "student", userName: propName, userAvatar: propAvatar, title }: AppShellProps) {
   const [sessionUser, setSessionUser] = useState<{ name: string; avatar: string; role: Role } | null>(null);
 
@@ -28,7 +36,7 @@ export default function AppShell({ children, role: propRole = "student", userNam
             setSessionUser({
               name: parsed.name,
               avatar: parsed.avatar,
-              role: parsed.role as Role
+              role: normalizeRole(parsed.role)
             });
             return;
           } catch (err) {
@@ -36,12 +44,12 @@ export default function AppShell({ children, role: propRole = "student", userNam
           }
         }
 
-        const storedRole = localStorage.getItem("current_role") as Role | null;
-        if (storedRole && ["student", "teacher", "qbm", "admin"].includes(storedRole)) {
+        const storedRole = localStorage.getItem("current_role");
+        if (storedRole) {
           setSessionUser({
             name: propName || "User",
             avatar: propAvatar || "U",
-            role: storedRole
+            role: normalizeRole(storedRole)
           });
         }
       }

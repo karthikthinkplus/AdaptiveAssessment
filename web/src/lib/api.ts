@@ -24,8 +24,18 @@ class ApiClient {
       throw new Error(`Failed to parse response: ${err}`);
     }
 
-    if (!response.ok || !json.success) {
-      throw new Error(json.message || `API request failed with status ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 422 && json && json.detail) {
+        const errors = Array.isArray(json.detail)
+          ? json.detail.map((d: any) => `${d.loc[d.loc.length - 1]}: ${d.msg}`).join(", ")
+          : JSON.stringify(json.detail);
+        throw new Error(`Validation Error - ${errors}`);
+      }
+      throw new Error(json?.message || `API request failed with status ${response.status}`);
+    }
+
+    if (!json || !json.success) {
+      throw new Error(json?.message || `API request failed with status ${response.status}`);
     }
 
     return json.data as T;

@@ -45,13 +45,17 @@ export default function DiagnosticReport() {
   const [gradeEquivalent, setGradeEquivalent] = useState<string>(r.gradeEquivalent);
   const [answerOutcomes, setAnswerOutcomes] = useState({ correct: 2, wrong: 1, guesses: 0 });
   const [averageTimePerQuestion, setAverageTimePerQuestion] = useState(72);
-  const thetaValue = r.abilityTheta.toFixed(2);
+  const [abilityTheta, setAbilityTheta] = useState<number>(r.abilityTheta);
+  const thetaValue = abilityTheta.toFixed(2);
   const betaValue = (overallScore / 100).toFixed(2);
   const [dashboardHref, setDashboardHref] = useState("/student/dashboard");
   const [topicPerformance, setTopicPerformance] = useState([
     { topic: "Algebra", score: 62 },
     { topic: "Arithmetic", score: 90 },
   ]);
+  const [studentName, setStudentName] = useState("Student");
+  const [studentGrade, setStudentGrade] = useState("Grade 8");
+  const [recentReports, setRecentReports] = useState<any[]>([]);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState("");
@@ -69,6 +73,43 @@ export default function DiagnosticReport() {
     if (typeof window !== "undefined") {
       setDashboardHref(getDashboardHref());
       const isMock = sessionId === "session-001" || sessionId === "session-002" || sessionId === "session-003" || sessionId === "latest";
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+
+      if (user) {
+        setStudentName(user.name || "Student");
+        setStudentGrade(user.institution ? `${user.grade || "Grade 8"} - ${user.institution}` : (user.grade || "Grade 8"));
+      }
+
+      if (user && user.id) {
+        const completedKey = `completed_sessions_${user.id}`;
+        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
+        
+        if (sessionIds.length > 0) {
+          Promise.all(sessionIds.slice(0, 3).map(async (sessId) => {
+            try {
+              const [analytics, details] = await Promise.all([
+                api.get<any>(`/api/v1/analytics/session/${sessId}`),
+                api.get<any>(`/api/v1/learning/sessions/${sessId}`)
+              ]);
+              const dateStr = details?.created_at ? new Date(details.created_at).toLocaleDateString() : new Date().toLocaleDateString();
+              const score = Math.round(analytics.accuracy);
+              return {
+                name: "Math Adaptive Test",
+                date: dateStr,
+                score,
+                sessionId: sessId,
+                subject: "Math"
+              };
+            } catch (err) {
+              console.error("Failed to load details for recent report", sessId, err);
+              return null;
+            }
+          })).then((results) => {
+            setRecentReports(results.filter(Boolean));
+          });
+        }
+      }
 
       if (!isMock) {
         api.get<any>(`/api/v1/analytics/session/${sessionId}`).then((res) => {
@@ -89,37 +130,52 @@ export default function DiagnosticReport() {
 
             // Fetch the session details to get average time
             api.get<any>(`/api/v1/learning/sessions/${sessionId}`).then((sess) => {
-              if (sess && sess.total_questions_attempted > 0) {
-                setAverageTimePerQuestion(Math.max(1, Math.round(sess.total_time_seconds / sess.total_questions_attempted)));
+              if (sess) {
+                if (sess.total_questions_attempted > 0) {
+                  setAverageTimePerQuestion(Math.max(1, Math.round(sess.total_time_seconds / sess.total_questions_attempted)));
+                }
+                const studentId = sess.student_id;
+                if (studentId) {
+                  const tpUser = sessionStorage.getItem("tp_user");
+                  if (tpUser) {
+                    try {
+                      const parsed = JSON.parse(tpUser);
+                      if (!parsed.student_id) {
+                        parsed.student_id = studentId;
+                        sessionStorage.setItem("tp_user", JSON.stringify(parsed));
+                        setStudentGrade(parsed.institution ? `${parsed.grade || "Grade 8"} - ${parsed.institution}` : (parsed.grade || "Grade 8"));
+                      }
+                    } catch (e) {
+                      console.error("Failed to save student_id from session", e);
+                    }
+                  }
+
+                  // Fetch the student's IRT trait or BKT states to populate masteryData
+                  api.get<any[]>(`/api/v1/adaptive/students/${studentId}/irt`).then((traits) => {
+                    if (traits && traits.length > 0) {
+                      const mappedPerformance = traits.map((t: any) => ({
+                        topic: "Mathematics",
+                        score: Math.min(100, Math.max(0, Math.round((t.theta + 3) / 6 * 100)))
+                      }));
+                      setTopicPerformance(mappedPerformance);
+                      setAbilityTheta(traits[0].theta);
+                    }
+                  }).catch(console.error);
+
+                  api.get<any[]>(`/api/v1/adaptive/students/${studentId}/bkt`).then((bkts) => {
+                    if (bkts && bkts.length > 0) {
+                      const mappedMastery = bkts.map((b: any) => ({
+                        skill: `Subtopic Mastery`,
+                        topic: "Mathematics",
+                        mastery: b.p_mastery,
+                        label: getMasteryLabel(b.p_mastery)
+                      }));
+                      setMasteryData(mappedMastery);
+                    }
+                  }).catch(console.error);
+                }
               }
             }).catch(console.error);
-
-            // Fetch the student's IRT trait or BKT states to populate masteryData
-            const tpUser = sessionStorage.getItem("tp_user");
-            const studentId = tpUser ? JSON.parse(tpUser).id : null;
-            if (studentId) {
-              api.get<any[]>(`/api/v1/adaptive/students/${studentId}/irt`).then((traits) => {
-                if (traits && traits.length > 0) {
-                  const mappedPerformance = traits.map((t: any) => ({
-                    topic: "Mathematics",
-                    score: Math.min(100, Math.max(0, Math.round((t.theta + 3) / 6 * 100)))
-                  }));
-                  setTopicPerformance(mappedPerformance);
-                }
-              }).catch(console.error);
-
-              api.get<any[]>(`/api/v1/adaptive/students/${studentId}/bkt`).then((bkts) => {
-                if (bkts && bkts.length > 0) {
-                  const mappedMastery = bkts.map((b: any) => ({
-                    skill: `Subtopic Mastery`,
-                    topic: "Mathematics",
-                    mastery: b.p_mastery,
-                    label: getMasteryLabel(b.p_mastery)
-                  }));
-                  setMasteryData(mappedMastery);
-                }
-              }).catch(console.error);
-            }
           }
         }).catch((err) => {
           console.error("Failed to load backend session analytics, using default mock fallback", err);
@@ -127,6 +183,12 @@ export default function DiagnosticReport() {
         });
       } else {
         loadMockStats();
+        // Load mock recent reports
+        setRecentReports([
+          { name: "Math Adaptive Test", date: "May 12, 2026", score: overallScore, sessionId: "session-001", subject: "Math" },
+          { name: "Number Theory Quiz", date: "Apr 28, 2026", score: 76, sessionId: "session-002", subject: "Math" },
+          { name: "Chemistry Practice", date: "May 20, 2026", score: 85, sessionId: "session-003", subject: "Chemistry" }
+        ]);
       }
 
       function loadMockStats() {
@@ -256,9 +318,9 @@ export default function DiagnosticReport() {
           <div>
             <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.75)", marginBottom: "0.375rem" }}>Diagnostic Report — {r.completedAt}</div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", marginBottom: "0.375rem" }}>
-              {r.studentName}
+              {studentName}
             </h1>
-            <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.8)" }}>{r.grade}</div>
+            <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.8)" }}>{studentGrade}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.72)", marginBottom: "0.5rem" }}>Ability Metrics</div>
@@ -348,44 +410,42 @@ export default function DiagnosticReport() {
         </div>
 
         {/* ── Recent Reports ───────────────────────────────────────── */}
-        <div className="animate-fade-in-up stagger-3">
-          <div style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Most Recent Reports</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
-            {[
-              { name: "Math Adaptive Test", date: "May 12, 2026", score: overallScore, sessionId: "session-001", subject: "Math" },
-              { name: "Number Theory Quiz", date: "Apr 28, 2026", score: 76, sessionId: "session-002", subject: "Math" },
-              { name: "Chemistry Practice", date: "May 20, 2026", score: 85, sessionId: "session-003", subject: "Chemistry" },
-            ].map((report, i) => (
-              <div key={i} className="tp-card" style={{ borderTop: "3px solid var(--primary)", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%" }}>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      {report.subject}
+        {recentReports.length > 0 && (
+          <div className="animate-fade-in-up stagger-3">
+            <div style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Most Recent Reports</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+              {recentReports.map((report, i) => (
+                <div key={i} className="tp-card" style={{ borderTop: "3px solid var(--primary)", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%" }}>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+                      <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {report.subject || "Math"}
+                      </div>
+                      <span className={`tp-badge ${report.score >= 80 ? "tp-badge-success" : "tp-badge-warning"}`}>
+                        {report.score}%
+                      </span>
                     </div>
-                    <span className={`tp-badge ${report.score >= 80 ? "tp-badge-success" : "tp-badge-warning"}`}>
-                      {report.score}%
-                    </span>
+                    <h4 style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                      {report.name}
+                    </h4>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>
+                      Completed: {report.date}
+                    </p>
+                    <div style={{ marginTop: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", border: "1px solid var(--border)", borderRadius: 999, background: "#fff", padding: "0.3rem 0.65rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-secondary)" }}>Knowledge:</span>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "var(--primary)" }}>{report.score}%</span>
+                    </div>
                   </div>
-                  <h4 style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem" }}>
-                    {report.name}
-                  </h4>
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>
-                    Completed: {report.date}
-                  </p>
-                  <div style={{ marginTop: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", border: "1px solid var(--border)", borderRadius: 999, background: "#fff", padding: "0.3rem 0.65rem" }}>
-                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-secondary)" }}>Knowledge:</span>
-                    <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "var(--primary)" }}>{report.score}%</span>
+                  <div style={{ marginTop: "1rem" }}>
+                    <Link href={`/report/${report.sessionId}`} className="tp-btn-ghost" style={{ display: "flex", width: "100%", justifyContent: "center", fontSize: "0.75rem", padding: "0.4rem", textDecoration: "none" }}>
+                      View Detailed Report
+                    </Link>
                   </div>
                 </div>
-                <div style={{ marginTop: "1rem" }}>
-                  <Link href={`/report/${report.sessionId}`} className="tp-btn-ghost" style={{ display: "flex", width: "100%", justifyContent: "center", fontSize: "0.75rem", padding: "0.4rem", textDecoration: "none" }}>
-                    View Detailed Report
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 

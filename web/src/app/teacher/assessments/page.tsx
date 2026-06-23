@@ -1,17 +1,38 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
-import { ASSESSMENTS as initialAssessments } from "@/lib/mockData";
 import { Search } from "lucide-react";
+import { api } from "@/lib/api";
 
-// Amit Verma teaches Class 10 - A. Only show assessments for Grade 10.
 const TEACHER_GRADE = "Grade 10";
 
 export default function TeacherAssessmentsPage() {
-  const [assessments] = useState(
-    initialAssessments.filter(a => !a.grade || a.grade === TEACHER_GRADE)
-  );
+  const [assessments, setAssessments] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    api.get<any[]>("/api/v1/topics").then((list) => {
+      const mapped = (list || []).map((topic: any) => {
+        const isGrade9 = topic.name.toLowerCase().includes("grade 9") || topic.name.toLowerCase().includes("class 9");
+        const isGrade8 = topic.name.toLowerCase().includes("grade 8") || topic.name.toLowerCase().includes("class 8");
+        const grade = isGrade9 ? "Grade 9" : isGrade8 ? "Grade 8" : "Grade 10";
+
+        return {
+          id: topic.id,
+          name: topic.name,
+          subject: "Mathematics",
+          grade,
+          questions: 15,
+          date: new Date(topic.created_at).toLocaleDateString(),
+          status: topic.is_active ? "active" : "completed",
+        };
+      });
+      // Filter for Grade 10 to simulate teacher profile
+      setAssessments(mapped.filter(a => a.grade === TEACHER_GRADE));
+    }).catch((err) => {
+      console.error("Failed to load assessments (topics) from API", err);
+    });
+  }, []);
 
   const filtered = assessments.filter(a =>
     a.name.toLowerCase().includes(search.toLowerCase()) ||

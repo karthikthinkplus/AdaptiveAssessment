@@ -1,9 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
-import { STUDENT_LIST } from "@/lib/mockData";
 import { Search, Eye, Users, X } from "lucide-react";
 import Link from "next/link";
+import { api } from "@/lib/api";
+
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 const getSkillsForStudent = (score: number) => {
   if (score >= 90) return ["Algebra", "Arithmetic", "Geometry"];
@@ -14,14 +22,29 @@ const getSkillsForStudent = (score: number) => {
 };
 
 export default function TeacherStudentsPage() {
-  const [students] = useState(() => 
-    STUDENT_LIST.map((s, idx) => ({
-      ...s,
-      grade: idx % 2 === 0 ? "Class 10 - A" : "Class 9 - B"
-    }))
-  );
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState("All Batches");
+
+  useEffect(() => {
+    api.get<any[]>("/api/v1/users").then((list) => {
+      const studentList = (list || [])
+        .filter(u => inferRole(u.email, u.institution_name) === "Student")
+        .map(u => ({
+          id: u.id,
+          name: u.full_name,
+          score: 0,
+          grade: u.institution_name || "Class 10 - A"
+        }));
+      setStudents(studentList);
+    }).catch((err) => {
+      console.error("Failed to fetch students in teacher student list", err);
+    }).finally(() => {
+      setLoading(false);
+    });
+  }, []);
+
 
   const filtered = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());

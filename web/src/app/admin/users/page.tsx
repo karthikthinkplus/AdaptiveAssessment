@@ -1,8 +1,9 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
-import { ADMIN_USER_LIST, INSTITUTION_LIST } from "@/lib/mockData";
 import { Search, UserPlus, Mail, X, Save } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+import { INSTITUTION_LIST } from "@/lib/mockData";
 
 type UserRole = "Student" | "Teacher" | "QBM" | "Admin";
 type UserStatus = "Active" | "Inactive";
@@ -17,17 +18,19 @@ interface AdminUser {
   joined: string;
 }
 
-const initialUsers: AdminUser[] = ADMIN_USER_LIST.map(user => ({
-  ...user,
-  role: user.role as UserRole,
-  status: user.status as UserStatus,
-}));
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 const emptyUserDraft: Omit<AdminUser, "id" | "joined"> = {
   name: "",
   email: "",
   role: "Student",
-  institution: INSTITUTION_LIST[0]?.name || "Platform",
+  institution: "Platform",
   status: "Active",
 };
 
@@ -35,10 +38,36 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [users, setUsers] = useState<AdminUser[]>(initialUsers);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [draft, setDraft] = useState(emptyUserDraft);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const list = await api.get<any[]>("/api/v1/users");
+      const mapped = (list || []).map((u: any) => ({
+        id: u.id,
+        name: u.full_name,
+        email: u.email,
+        role: inferRole(u.email, u.institution_name) as UserRole,
+        institution: u.institution_name || "Platform",
+        status: (u.is_active ? "Active" : "Inactive") as UserStatus,
+        joined: new Date(u.created_at).toLocaleDateString()
+      }));
+      setUsers(mapped);
+    } catch (err) {
+      console.error("Failed to load users from backend", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   const filteredUsers = users.filter(user => {
     const query = searchTerm.toLowerCase();
@@ -76,18 +105,34 @@ export default function AdminUsersPage() {
     setDraft(emptyUserDraft);
   };
 
-  const saveUser = (event: React.FormEvent) => {
+  const saveUser = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (editingUser) {
-      setUsers(prev => prev.map(user => user.id === editingUser.id ? { ...user, ...draft } : user));
-    } else {
-      setUsers(prev => [{
-        ...draft,
-        id: `au${Date.now()}`,
-        joined: "Jun 18, 2026",
-      }, ...prev]);
+    try {
+      if (editingUser) {
+        alert("Updating user profile info is handled via self-service profiles. Only status changes can be toggled here.");
+      } else {
+        if (draft.role === "Student") {
+          await api.post("/api/v1/auth/signup/student", {
+            email: draft.email,
+            password: "Password123!",
+            full_name: draft.name,
+            grade: "Grade 10",
+            student_code: `STU${Date.now().toString().slice(-4)}`
+          });
+        } else {
+          await api.post("/api/v1/auth/signup/teacher", {
+            email: draft.email,
+            password: "Password123!",
+            full_name: draft.name,
+            institution_name: draft.institution
+          });
+        }
+        await loadUsers();
+      }
+      closeModal();
+    } catch (err: any) {
+      alert("Failed to save user: " + err.message);
     }
-    closeModal();
   };
 
   const toggleUserStatus = (id: string) => {

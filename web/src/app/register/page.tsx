@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  const [institution, setInstitution] = useState("");
   const [grade, setGrade] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +33,7 @@ export default function RegisterPage() {
         password: password,
         phone_number: mobile,
         grade: `Grade ${grade}`,
-        institution_name: "Delhi Public School",
+        institution_name: institution.trim() || null,
       });
 
       // 2. Perform auto-login
@@ -201,6 +202,24 @@ export default function RegisterPage() {
                 placeholder="Enter your 10-digit mobile number"
                 value={mobile}
                 onChange={e => setMobile(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Institution Name */}
+            <div style={{ width: "100%", marginBottom: "1.25rem" }}>
+              <label style={labelStyle}>
+                Institution Name
+              </label>
+              <input
+                id="register-institution"
+                type="text"
+                style={inputStyle}
+                onFocus={e => (e.currentTarget.style.borderBottomColor = "var(--primary)")}
+                onBlur={e => (e.currentTarget.style.borderBottomColor = "var(--border)")}
+                placeholder="Enter your school/institution name"
+                value={institution}
+                onChange={e => setInstitution(e.target.value)}
                 required
               />
             </div>

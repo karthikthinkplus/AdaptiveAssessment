@@ -33,7 +33,7 @@ export default function TeacherRegisterPage() {
         email: lowerEmail,
         password: password,
         phone_number: mobile,
-        institution_name: institution || "Delhi Public School",
+        institution_name: institution.trim() || null,
         department: specialization,
         designation: "Educator",
       });

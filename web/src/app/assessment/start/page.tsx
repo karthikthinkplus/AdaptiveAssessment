@@ -69,9 +69,22 @@ export default function AssessmentStart() {
     } else {
       try {
         const response = await api.post<{
-          session: { id: string };
+          session: { id: string; student_id: string };
           first_question: any;
         }>("/api/v1/learning/sessions/start", { topic_id: grade });
+
+        if (response.session && response.session.student_id) {
+          const tpUser = sessionStorage.getItem("tp_user");
+          if (tpUser) {
+            try {
+              const parsed = JSON.parse(tpUser);
+              parsed.student_id = response.session.student_id;
+              sessionStorage.setItem("tp_user", JSON.stringify(parsed));
+            } catch (e) {
+              console.error("Failed to update user session with student_id", e);
+            }
+          }
+        }
 
         router.push(`/assessment/${response.session.id}`);
       } catch (err: any) {

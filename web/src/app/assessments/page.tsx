@@ -1,9 +1,9 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
-import { ASSESSMENTS } from "@/lib/mockData";
 import { Search, Plus, Play } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 type AssessmentTab = "all" | "active" | "completed";
 type SessionUser = {
@@ -19,6 +19,7 @@ export default function AssessmentsListPage() {
   const [tab, setTab] = useState<AssessmentTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const [assessments, setAssessments] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -31,9 +32,26 @@ export default function AssessmentsListPage() {
         }
       }
     }
+
+    api.get<any[]>("/api/v1/topics").then((list) => {
+      const mapped = (list || []).map((topic: any) => {
+        return {
+          id: topic.id,
+          name: topic.name,
+          subject: "Mathematics",
+          questions: 15,
+          duration: 30,
+          date: new Date(topic.created_at).toLocaleDateString(),
+          status: topic.is_active ? "active" : "completed",
+        };
+      });
+      setAssessments(mapped);
+    }).catch((err) => {
+      console.error("Failed to load assessments (topics) from API", err);
+    });
   }, []);
 
-  const shown = ASSESSMENTS.filter(a => {
+  const shown = assessments.filter(a => {
     const matchesTab = tab === "all" || a.status === tab;
     const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (a.subject && a.subject.toLowerCase().includes(searchQuery.toLowerCase()));

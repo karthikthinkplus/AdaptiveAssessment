@@ -1,16 +1,35 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
 import { Search, ClipboardList, Play } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 export default function AdminAssessmentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const assessments = [
-    { id: "A101", title: "Grade 10 Mathematics Final", subject: "Math", questions: 25, activeSessions: 42, completed: 180, status: "Active" },
-    { id: "A102", title: "Grade 9 Biology Mid-Term", subject: "Science", questions: 30, activeSessions: 0, completed: 145, status: "Draft" },
-    { id: "A103", title: "Grade 10 English Comprehension", subject: "English", questions: 15, activeSessions: 12, completed: 92, status: "Active" },
-    { id: "A104", title: "Grade 8 Trigonometry Quiz", subject: "Math", questions: 20, activeSessions: 0, completed: 210, status: "Archived" },
-  ];
+  const [assessments, setAssessments] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.get<any[]>("/api/v1/topics").then((list) => {
+      const mapped = (list || []).map((topic: any) => {
+        const isGrade9 = topic.name.toLowerCase().includes("grade 9") || topic.name.toLowerCase().includes("class 9");
+        const isGrade8 = topic.name.toLowerCase().includes("grade 8") || topic.name.toLowerCase().includes("class 8");
+        const grade = isGrade9 ? "Grade 9" : isGrade8 ? "Grade 8" : "Grade 10";
+
+        return {
+          id: topic.id,
+          title: topic.name,
+          subject: "Math",
+          questions: 15,
+          activeSessions: 0,
+          completed: 0,
+          status: topic.is_active ? "Active" : "Archived"
+        };
+      });
+      setAssessments(mapped);
+    }).catch((err) => {
+      console.error("Failed to load assessments from API", err);
+    });
+  }, []);
 
   const filtered = assessments.filter(a => 
     a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
-import { MOCK_USERS, STUDENT_STATS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 import { MOCK_AVATARS, AvatarItem } from "@/lib/avatarsData";
 import { Edit2, Camera, Key, School, ShieldAlert, Award, User, X, Search, Flame } from "lucide-react";
 
@@ -20,13 +20,6 @@ type ProfileSession = {
 
 const isRole = (value: unknown): value is Role =>
   value === "student" || value === "teacher" || value === "qbm" || value === "admin";
-
-const roleFallbacks: Record<Role, (typeof MOCK_USERS)[number]> = {
-  student: MOCK_USERS.find(user => user.role === "student") || MOCK_USERS[0],
-  teacher: MOCK_USERS.find(user => user.role === "teacher") || MOCK_USERS[0],
-  qbm: MOCK_USERS.find(user => user.role === "qbm") || MOCK_USERS[0],
-  admin: MOCK_USERS.find(user => user.role === "admin") || MOCK_USERS[0],
-};
 
 const roleFromPathname = (pathname: string | null): Role | null => {
   if (pathname?.startsWith("/teacher/profile")) return "teacher";
@@ -48,20 +41,15 @@ const getInitialProfile = (pathRole?: Role | null): ProfileSession | null => {
     const role: Role | null = pathRole || parsedRole || fallbackRole;
     if (!role) return null;
 
-    const sessionEmail = typeof parsed?.email === "string" ? parsed.email.toLowerCase().trim() : "";
-    const userRecord =
-      MOCK_USERS.find(user => user.role === role && user.email.toLowerCase() === sessionEmail) ||
-      roleFallbacks[role];
-
     return {
       role,
-      name: parsedRole === role ? (parsed.name || userRecord.name) : userRecord.name,
-      email: parsedRole === role ? (parsed.email || userRecord.email) : userRecord.email,
-      avatar: parsedRole === role ? (parsed.avatar || userRecord.avatar) : userRecord.avatar,
-      institution: parsedRole === role ? (parsed.institution || userRecord.institution) : userRecord.institution,
-      grade: userRecord.grade,
-      dob: parsedRole === role ? (parsed.dob || userRecord.dob) : userRecord.dob,
-      phone: parsedRole === role ? (parsed.phone || userRecord.phone) : userRecord.phone,
+      name: parsed?.name || parsed?.full_name || "User",
+      email: parsed?.email || "email@example.com",
+      avatar: parsed?.avatar || "U",
+      institution: parsed?.institution || parsed?.institution_name || "Platform",
+      grade: parsed?.grade || "Grade 10",
+      dob: parsed?.dob || "Not provided",
+      phone: parsed?.phone || parsed?.phone_number || "Not provided",
     };
   } catch (err) {
     console.error("Failed to parse tp_user in profile", err);
@@ -113,15 +101,52 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
     activeRole === "qbm" ? "Content Operations" :
     "System Administration"
   );
-  const streakCount = activeRole === "student" ? 12 : activeRole === "teacher" ? 8 : activeRole === "qbm" ? 6 : 15;
-  const skillValue = activeRole === "student" ? STUDENT_STATS.abilityLabel :
+  const [streakCount, setStreakCount] = useState(activeRole === "student" ? 0 : activeRole === "teacher" ? 8 : activeRole === "qbm" ? 6 : 15);
+  const [skillValue, setSkillValue] = useState(
+    activeRole === "student" ? "Not Assessed" :
     activeRole === "teacher" ? "Mathematics" :
     activeRole === "qbm" ? "Content Operations" :
-    "Platform Administration";
-  const overallKnowledgeValue = activeRole === "student" ? `${STUDENT_STATS.overallProgress}%` :
+    "Platform Administration"
+  );
+  const [overallKnowledgeValue, setOverallKnowledgeValue] = useState(
+    activeRole === "student" ? "0%" :
     activeRole === "teacher" ? "74.5%" :
-    activeRole === "qbm" ? "104 approved" :
-    "99.9%";
+    activeRole === "qbm" ? "0 approved" :
+    "99.9%"
+  );
+
+  useEffect(() => {
+    if (activeRole === "student" && typeof window !== "undefined") {
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+
+      const fetchStudentAnalytics = (studentId: string) => {
+        api.get<any>(`/api/v1/analytics/student/${studentId}`).then((res) => {
+          if (res) {
+            setStreakCount(0); // Default to 0 streak on clean DB
+            setSkillValue(res.accuracy >= 90 ? "Advanced" : res.accuracy >= 60 ? "Intermediate" : "Beginner");
+            setOverallKnowledgeValue(`${Math.round(res.accuracy)}%`);
+          }
+        }).catch(console.error);
+      };
+
+      if (user && user.student_id) {
+        fetchStudentAnalytics(user.student_id);
+      } else if (user && user.id) {
+        const completedKey = `completed_sessions_${user.id}`;
+        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
+        if (sessionIds.length > 0) {
+          api.get<any>(`/api/v1/learning/sessions/${sessionIds[0]}`).then((sess) => {
+            if (sess && sess.student_id) {
+              user.student_id = sess.student_id;
+              sessionStorage.setItem("tp_user", JSON.stringify(user));
+              fetchStudentAnalytics(sess.student_id);
+            }
+          }).catch(console.error);
+        }
+      }
+    }
+  }, [activeRole]);
 
   // Avatar states
   const [activeAvatar, setActiveAvatar] = useState<{ emoji: string; bgGradient: string } | string>(initialProfile.avatar);

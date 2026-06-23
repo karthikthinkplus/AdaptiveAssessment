@@ -3,51 +3,69 @@ import { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import { FileText, Eye, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { api } from "@/lib/api";
 
 export default function ReportsListPage() {
-  const [loading] = useState(false);
-  const [error] = useState(false);
-  const [hasReports] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reportsList, setReportsList] = useState<any[]>([]);
+  const [userName, setUserName] = useState("Student");
+  const [userAvatar, setUserAvatar] = useState("S");
 
-  const [reportsList, setReportsList] = useState([
-    { id: "session-001", name: "Math Adaptive Test", subject: "Algebra", date: "2024-05-12", score: 82, mastery: "Developing", status: "Completed" },
-    { id: "session-002", name: "Number Theory Quiz", subject: "Arithmetic", date: "2024-04-28", score: 76, mastery: "Developing", status: "Completed" }
-  ]);
+  const hasReports = reportsList.length > 0;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.setTimeout(() => {
-        setReportsList(prev => prev.map(r => {
-        const savedAnswers = localStorage.getItem(`assessment_answers_${r.id}`) || (r.id === "session-001" ? localStorage.getItem("assessment_answers") : null);
-        if (savedAnswers) {
-          const answers = JSON.parse(savedAnswers) as Record<number, string>;
-          const q1Correct = answers[0] === "B";
-          const q2Correct = answers[1] === "B";
-          const q3Correct = answers[2] === "A";
-          
-          let correctCount = 0;
-          if (q1Correct) correctCount++;
-          if (q2Correct) correctCount++;
-          if (q3Correct) correctCount++;
-          
-          const calculatedScore = Math.round((correctCount / 3) * 100);
-          const computedMastery = calculatedScore >= 90 ? "Mastered" : calculatedScore >= 31 ? "Developing" : "Gap";
-          return {
-            ...r,
-            score: calculatedScore,
-            mastery: computedMastery
-          };
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+      if (user) {
+        setUserName(user.name || "Student");
+        setUserAvatar(user.avatar || "S");
+        
+        const completedKey = `completed_sessions_${user.id}`;
+        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
+        
+        if (sessionIds.length > 0) {
+          Promise.all(sessionIds.map(async (sessId) => {
+            try {
+              const [analytics, details] = await Promise.all([
+                api.get<any>(`/api/v1/analytics/session/${sessId}`),
+                api.get<any>(`/api/v1/learning/sessions/${sessId}`)
+              ]);
+              const dateStr = details?.created_at ? new Date(details.created_at).toLocaleDateString() : new Date().toLocaleDateString();
+              const score = Math.round(analytics.accuracy);
+              const computedMastery = score >= 90 ? "Mastered" : score >= 31 ? "Developing" : "Gap";
+              return {
+                id: sessId,
+                name: "Math Adaptive Test",
+                subject: "Mathematics",
+                date: dateStr,
+                score,
+                mastery: computedMastery,
+                status: details?.status || "Completed"
+              };
+            } catch (err) {
+              console.error("Failed to load details for session", sessId, err);
+              return null;
+            }
+          })).then((results) => {
+            const validReports = results.filter(Boolean);
+            setReportsList(validReports);
+            setLoading(false);
+          }).catch(() => {
+            setLoading(false);
+          });
+        } else {
+          setLoading(false);
         }
-        return r;
-        }));
-      }, 0);
+      } else {
+        setLoading(false);
+      }
     }
   }, []);
 
-
-
   return (
-    <AppShell role="student" userName="Arjun Kumar" userAvatar="AK" title="Reports">
+    <AppShell role="student" userName={userName} userAvatar={userAvatar} title="Reports">
 
       {loading ? (
         /* ── Loading State ─────────────────────────────────────────── */

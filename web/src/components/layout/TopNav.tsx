@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
-import { Bell, ChevronDown, Flame, Info, Mail, Menu, PanelLeftClose, Phone, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, ChevronDown, Flame, Info, Mail, Menu, PanelLeftClose, Phone, X, Megaphone, UserCheck, BookOpen, ShieldAlert, FileText } from "lucide-react";
 
 interface TopNavProps {
   userName?: string;
@@ -13,11 +13,76 @@ interface TopNavProps {
 }
 
 export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", title, role = "student", sidebarClosed = false, onToggleSidebar }: TopNavProps) {
-  const notificationsHref = role === "admin" ? "/admin/notifications" : "/notifications";
   const profileHref = `/${role}/profile`;
   const [showHelp, setShowHelp] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationsList, setNotificationsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const activeRole = role;
+      const targetRoleKey = activeRole === "admin" ? "admin" : `${activeRole}s`;
+
+      const saved = localStorage.getItem("admin_notifications");
+      let customNotifications: any[] = [];
+      if (saved) {
+        try {
+          customNotifications = JSON.parse(saved);
+        } catch (err) {
+          console.error("Failed to parse admin notifications", err);
+        }
+      }
+
+      const filteredCustom = customNotifications.filter((n: any) => n.targets?.includes(targetRoleKey));
+      
+      const mockWithTargets = [
+        { id: "n1", title: "New Assessment Assigned", message: "Math Adaptive Test has been assigned to Class 10 - A", time: "2 min ago", type: "assignment", read: false, important: true, targets: ["students"] },
+        { id: "n2", title: "Report Generated", message: "Performance report for Math Adaptive Test is ready", time: "1 hour ago", type: "report", read: false, important: false, targets: ["students"] },
+        { id: "n3", title: "Question Approved", message: "Your question Q21001 has been approved", time: "3 hours ago", type: "approval", read: true, important: false, targets: ["teachers", "qbms"] },
+        { id: "n4", title: "System Update", message: "Scheduled maintenance on May 28, 2024 at 11:00 PM", time: "1 day ago", type: "system", read: true, important: true, targets: ["students", "teachers", "qbms", "admin"] },
+        { id: "n5", title: "New Student Enrolled", message: "5 new students have joined Class 9 - B", time: "2 days ago", type: "assignment", read: true, important: false, targets: ["teachers"] },
+      ];
+      
+      const filteredMock = mockWithTargets.filter((n: any) => n.targets?.includes(targetRoleKey));
+
+      const formattedCustom = filteredCustom.map((n: any) => ({
+        id: `custom-${n.id}`,
+        title: n.title,
+        message: n.desc,
+        time: n.time,
+        type: n.type,
+        read: false,
+        important: n.important
+      }));
+
+      setNotificationsList([...formattedCustom, ...filteredMock]);
+    }
+  }, [role, showNotifications]);
+
+  const getNotifIcon = (type: string, important: boolean) => {
+    const color = important ? "var(--danger)" : "var(--primary)";
+    const bg = important ? "var(--danger-light)" : "var(--primary-light)";
+    
+    let icon = <Megaphone size={14} color={color} />;
+    if (type === "system") icon = <UserCheck size={14} color={color} />;
+    else if (type === "assignment") icon = <BookOpen size={14} color={color} />;
+    else if (type === "alert" || type === "approval") icon = <ShieldAlert size={14} color={color} />;
+    else if (type === "report") icon = <FileText size={14} color={color} />;
+    
+    return (
+      <div style={{
+        width: 28, height: 28, borderRadius: 8, background: bg,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+      }}>
+        {icon}
+      </div>
+    );
+  };
+
   const showStreak = title?.toLowerCase().includes("dashboard");
   const streakCount = role === "student" ? 12 : role === "teacher" ? 8 : role === "qbm" ? 6 : 15;
+  const unreadCount = notificationsList.filter(n => !n.read).length;
+
   const isImageAvatar = userAvatar.startsWith("/avatars/");
 
   return (
@@ -167,24 +232,195 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
           )}
         </div>
 
-        {/* Notification Bell */}
-        <Link href={notificationsHref} style={{
-          position: "relative", background: "none", border: "none", cursor: "pointer",
-          width: 38, height: 38, borderRadius: "50%", display: "flex",
-          alignItems: "center", justifyContent: "center",
-          color: "var(--text-secondary)", transition: "background 0.15s ease", textDecoration: "none",
-        }}
-          onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-hover)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "none")}
-          title="Open notifications"
-        >
-          <Bell size={20} />
-          <span style={{
-            position: "absolute", top: 6, right: 6,
-            width: 8, height: 8, borderRadius: "50%",
-            background: "var(--primary)", border: "2px solid #fff",
-          }} />
-        </Link>
+        {/* Notification Bell with Popup Dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            aria-label="Notifications"
+            title="Notifications"
+            onClick={() => setShowNotifications(prev => !prev)}
+            style={{
+              background: showNotifications ? "var(--surface-hover)" : "none",
+              border: "none",
+              cursor: "pointer",
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-secondary)",
+              transition: "background 0.15s ease",
+              position: "relative"
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-hover)")}
+            onMouseLeave={e => (e.currentTarget.style.background = showNotifications ? "var(--surface-hover)" : "none")}
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute",
+                top: 6,
+                right: 6,
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--primary)",
+                border: "2px solid #fff",
+              }} />
+            )}
+          </button>
+
+          {showNotifications && (
+            <div
+              className="tp-card animate-scale-in"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 0.75rem)",
+                right: 0,
+                width: 360,
+                maxHeight: 480,
+                padding: 0,
+                zIndex: 85,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                boxShadow: "var(--shadow-lg)"
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "1rem 1.2rem",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--surface)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <Bell size={16} color="var(--primary)" />
+                  <span style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--text-primary)" }}>
+                    Notifications
+                  </span>
+                  {unreadCount > 0 && (
+                    <span style={{
+                      fontSize: "0.7rem",
+                      fontWeight: 750,
+                      background: "var(--primary)",
+                      color: "#fff",
+                      padding: "0.15rem 0.4rem",
+                      borderRadius: 999
+                    }}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-muted)",
+                    display: "grid",
+                    placeItems: "center",
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%"
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-hover)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* List */}
+              <div style={{
+                overflowY: "auto",
+                flex: 1,
+                maxHeight: 360,
+                background: "var(--bg)"
+              }}>
+                {notificationsList.length === 0 ? (
+                  <div style={{ padding: "3rem 1.5rem", textAlign: "center", color: "var(--text-secondary)" }}>
+                    <Bell size={32} style={{ color: "var(--border)", marginBottom: "0.75rem" }} />
+                    <p style={{ fontWeight: 600, fontSize: "0.85rem" }}>No notifications found</p>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                      You&apos;re all caught up!
+                    </p>
+                  </div>
+                ) : (
+                  notificationsList.map((n, i) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        display: "flex",
+                        gap: "0.75rem",
+                        padding: "0.95rem 1.2rem",
+                        borderBottom: i === notificationsList.length - 1 ? "none" : "1px solid var(--border)",
+                        background: n.important ? "rgba(239, 68, 68, 0.02)" : "transparent",
+                        borderLeft: n.important ? "3px solid var(--danger)" : "none",
+                        alignItems: "flex-start",
+                        transition: "background 0.2s"
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-hover)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = n.important ? "rgba(239, 68, 68, 0.02)" : "transparent")}
+                    >
+                      {getNotifIcon(n.type, n.important)}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.25rem" }}>
+                          <h4 style={{
+                            fontSize: "0.85rem",
+                            fontWeight: 750,
+                            color: "var(--text-primary)",
+                            margin: 0,
+                            lineHeight: 1.25,
+                            wordBreak: "break-word"
+                          }}>
+                            {n.title}
+                          </h4>
+                        </div>
+                        <p style={{
+                          fontSize: "0.78rem",
+                          color: "var(--text-secondary)",
+                          marginTop: "0.2rem",
+                          marginBottom: 0,
+                          lineHeight: 1.35,
+                          wordBreak: "break-word"
+                        }}>
+                          {n.message}
+                        </p>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "block", marginTop: "0.35rem" }}>
+                          {n.time}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Admin Footer Link */}
+              {role === "admin" && (
+                <div style={{
+                  padding: "0.75rem 1rem",
+                  borderTop: "1px solid var(--border)",
+                  textAlign: "center",
+                  background: "var(--surface)"
+                }}>
+                  <Link
+                    href="/admin/notifications"
+                    onClick={() => setShowNotifications(false)}
+                    style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}
+                  >
+                    Manage Notifications →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* User Avatar */}
         <Link href={profileHref} style={{

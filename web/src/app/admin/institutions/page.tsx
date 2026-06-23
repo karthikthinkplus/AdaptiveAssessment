@@ -1,8 +1,19 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
-import { INSTITUTION_LIST, type Institution } from "@/lib/mockData";
 import { Search, Building, Plus, MapPin, X, Save, Trash2, Power } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+
+export interface Institution {
+  id: string;
+  name: string;
+  type: "School" | "College";
+  city: string;
+  students: number;
+  teachers: number;
+  status: "Active" | "Inactive";
+  joinedAt: string;
+}
 
 type InstitutionDraft = Omit<Institution, "id" | "joinedAt">;
 
@@ -15,20 +26,50 @@ const emptyDraft: InstitutionDraft = {
   status: "Active",
 };
 
-const EXTRA_INSTITUTIONS: Institution[] = [
-  { id: "i7", name: "Christ Junior College", type: "College", city: "Bengaluru", students: 760, teachers: 28, status: "Active", joinedAt: "Jun 2026" },
-  { id: "i8", name: "Loyola College Prep", type: "College", city: "Chennai", students: 640, teachers: 24, status: "Inactive", joinedAt: "Jun 2026" },
-];
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 export default function AdminInstitutionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [institutions, setInstitutions] = useState<Institution[]>([...INSTITUTION_LIST, ...EXTRA_INSTITUTIONS]);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [profileInstitution, setProfileInstitution] = useState<Institution | null>(null);
   const [editingInstitution, setEditingInstitution] = useState<Institution | null>(null);
   const [draft, setDraft] = useState<InstitutionDraft>(emptyDraft);
+
+  useEffect(() => {
+    api.get<any[]>("/api/v1/users").then((list) => {
+      const uList = list || [];
+      const instNames = Array.from(new Set(uList.map(u => u.institution_name).filter(Boolean)));
+      
+      const mapped = instNames.map((name, idx) => {
+        const matchingUsers = uList.filter(u => u.institution_name === name);
+        const stuCount = matchingUsers.filter(u => inferRole(u.email, u.institution_name) === "Student").length;
+        const teachCount = matchingUsers.filter(u => inferRole(u.email, u.institution_name) === "Teacher").length;
+        return {
+          id: `inst-${idx}`,
+          name,
+          type: "School" as const,
+          city: "Local",
+          students: stuCount,
+          teachers: teachCount,
+          status: "Active" as const,
+          joinedAt: "Jun 2026"
+        };
+      });
+      setInstitutions(mapped);
+    }).catch((err) => {
+      console.error("Failed to load institutions from API users list", err);
+    });
+  }, []);
+
 
   const filteredInsts = institutions.filter(inst => {
     const query = searchTerm.toLowerCase();

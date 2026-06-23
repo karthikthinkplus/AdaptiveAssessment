@@ -2,16 +2,25 @@
 import AppShell from "@/components/layout/AppShell";
 import SkillPieChart from "@/components/charts/SkillPieChart";
 import SimpleBarChart from "@/components/charts/SimpleBarChart";
-import {
-  TOPIC_PERFORMANCE_RADAR, STUDENT_LIST
-} from "@/lib/mockData";
+import { TOPIC_PERFORMANCE_RADAR } from "@/lib/mockData";
 import { Users, BarChart2, AlertCircle, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+
+const inferRole = (email: string, inst: string | null): string => {
+  const e = email.toLowerCase();
+  if (e.includes("admin")) return "Admin";
+  if (e.includes("qbm") || e.includes("content")) return "QBM";
+  if (e.includes("teacher") || inst === "School" || inst?.includes("Public School")) return "Teacher";
+  return "Student";
+};
 
 export default function TeacherDashboard() {
-  const [hasStudents] = useState(true);
+  const [hasStudents, setHasStudents] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState("Class 10 - A");
   const [selectedSubject, setSelectedSubject] = useState("Math");
+
 
   const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedClass(e.target.value);
@@ -32,8 +41,22 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("current_role", "teacher");
+
+      api.get<any[]>("/api/v1/users").then((list) => {
+        const studentList = (list || []).filter(u => inferRole(u.email, u.institution_name) === "Student");
+        if (studentList.length > 0) {
+          setHasStudents(true);
+          setStudents(studentList);
+        } else {
+          setHasStudents(false);
+        }
+      }).catch((err) => {
+        console.error("Teacher dashboard failed to load users from API, falling back to empty state", err);
+        setHasStudents(false);
+      });
     }
   }, []);
+
 
   // Interactive Date Range Picker States
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -94,12 +117,9 @@ export default function TeacherDashboard() {
   
   // Stats multipliers based on selectedClass/Subject
   let classMultiplier = 1.0;
-  if (selectedClass === "Class 10 - B") classMultiplier = 0.88;
-  else if (selectedClass === "Class 9 - A") classMultiplier = 0.75;
-
-  const totalStudents = Math.round(STUDENT_LIST.length * classMultiplier);
-  const masteredTopics = Math.min(20, Math.round((10 + (chartAvg % 8)) * (selectedSubject === "Science" ? 0.85 : 1)));
-  const needingAttention = Math.max(1, Math.round(((chartAvg % 5) + 1) / classMultiplier));
+  const totalStudents = students.length;
+  const masteredTopics = 0;
+  const needingAttention = 0;
 
   // Formatting Date Range for Display
   const formatDateRange = (start: Date, end: Date) => {

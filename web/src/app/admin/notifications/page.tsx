@@ -128,7 +128,7 @@ export default function AdminNotificationsPage() {
 
   return (
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Platform Alerts & Notifications">
-      <div className="animate-fade-in-up">
+      <div className="animate-fade-in-up" style={{ maxWidth: "700px", margin: "0 auto" }}>
         {/* ── Actions Row ────────────────────────────────────────────── */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
           <button 
@@ -141,7 +141,7 @@ export default function AdminNotificationsPage() {
         </div>
 
         {/* ── Notifications List ───────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxWidth: "700px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {notifications.map(n => (
             <div 
               key={n.id} 
