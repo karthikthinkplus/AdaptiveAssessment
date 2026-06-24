@@ -29,15 +29,39 @@ export default function AssessmentPlayer() {
 
   // Load first question if backend session
   useEffect(() => {
-    if (!isMock && typeof window !== "undefined") {
-      const q = sessionStorage.getItem("tp_current_question");
-      if (q) {
-        try {
-          setCurrentQuestion(JSON.parse(q));
-        } catch (e) {
-          console.error("Failed to parse first question from session storage", e);
+    if (!isMock) {
+      const loadQuestion = async () => {
+        // Try getting it from sessionStorage first
+        const q = typeof window !== "undefined" ? sessionStorage.getItem("tp_current_question") : null;
+        if (q) {
+          try {
+            setCurrentQuestion(JSON.parse(q));
+            return;
+          } catch (e) {
+            console.error("Failed to parse first question from session storage", e);
+          }
         }
-      }
+        
+        // Fetch from backend if sessionStorage is empty or invalid
+        setLoadingQuestion(true);
+        try {
+          const res = await api.get<{
+            session: any;
+            question: any;
+          }>(`/api/v1/learning/sessions/${sessionId}/current-question`);
+          
+          if (res.question) {
+            sessionStorage.setItem("tp_current_question", JSON.stringify(res.question));
+            setCurrentQuestion(res.question);
+          }
+        } catch (err) {
+          console.error("Failed to fetch current question from backend", err);
+        } finally {
+          setLoadingQuestion(false);
+        }
+      };
+      
+      loadQuestion();
     }
   }, [sessionId, isMock]);
 

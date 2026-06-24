@@ -13,10 +13,12 @@ class NavigationService:
         mastery_threshold: float,
         has_next_subtopic: bool,
         has_prerequisite: bool,
+        correct_count: int,
+        incorrect_count: int,
     ) -> str:
-        if mastery >= mastery_threshold and has_next_subtopic:
+        if correct_count >= 5 and has_next_subtopic:
             return NAV_ACTION_ADVANCE
-        if mastery < 0.4 and has_prerequisite:
+        if incorrect_count >= 1 and has_prerequisite:
             return NAV_ACTION_BACKTRACK
         if mastery_threshold > mastery >= 0.8:
             return NAV_ACTION_REVIEW

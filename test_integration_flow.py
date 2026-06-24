@@ -25,6 +25,28 @@ def run_tests():
     headers = {"Authorization": f"Bearer {token}"}
     print("[OK] Login successful! Token retrieved.")
     
+    # 1.1 Test student/me
+    print("[1.1] Testing Student Profile (/students/me)...")
+    res = requests.get(f"{base_url}/students/me", headers=headers)
+    if res.status_code != 200:
+        print(f"[FAIL] Fetching student profile failed: {res.text}")
+        return
+    student_data = res.json().get("data", {})
+    student_id = student_data.get("id")
+    if not student_id:
+        print(f"[FAIL] No student ID returned: {student_data}")
+        return
+    print(f"[OK] Student profile fetched successfully! Student ID: {student_id}")
+
+    # 1.2 Test learning/sessions
+    print("[1.2] Testing Student Sessions (/learning/sessions)...")
+    res = requests.get(f"{base_url}/learning/sessions", headers=headers)
+    if res.status_code != 200:
+        print(f"[FAIL] Fetching student sessions failed: {res.text}")
+        return
+    sessions_list = res.json().get("data", [])
+    print(f"[OK] Student sessions fetched successfully! Found {len(sessions_list)} sessions.")
+
     # 2. Get Topics
     print("[2/5] Testing Fetch Topics (/topics)...")
     res = requests.get(f"{base_url}/topics", headers=headers)

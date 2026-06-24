@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import (
     EVENT_TYPE_VALID,
+    IRT_THETA_LOWER_THRESHOLD,
+    IRT_THETA_UPPER_THRESHOLD,
     NAV_ACTION_SESSION_START,
+    SESSION_MAX_QUESTIONS,
     SESSION_STATUS_ACTIVE,
     SESSION_STATUS_COMPLETED,
     SESSION_STATUS_PAUSED,
@@ -75,11 +78,25 @@ class LearningSessionService:
         previous_responses = self.response_repo.list_by_session(session_id)
         excluded_ids = [response.question_id for response in previous_responses]
         difficulty_gate = PoolBuilderService.difficulty_gate_from_theta(theta)
+        
+        # Try current subtopic with strict difficulty gate
         current_pool = self.question_repo.list_candidate_questions(topic_id, subtopic_id, excluded_ids, difficulty_gate)
+        
+        # Relax difficulty gate for current subtopic if pool is too small (avoids premature subtopic jumping)
+        if len(current_pool) < 2 and subtopic_id is not None:
+            relaxed_gate = ["very easy", "easy", "medium", "hard", "very hard"]
+            current_pool = self.question_repo.list_candidate_questions(topic_id, subtopic_id, excluded_ids, relaxed_gate)
+            
+        # Try fallback topic-wide pool
         topic_pool = self.question_repo.list_candidate_questions(topic_id, None, excluded_ids, difficulty_gate)
+        if len(topic_pool) < 2:
+            relaxed_gate = ["very easy", "easy", "medium", "hard", "very hard"]
+            topic_pool = self.question_repo.list_candidate_questions(topic_id, None, excluded_ids, relaxed_gate)
+            
         candidate_pool = PoolBuilderService.fallback_topic_pool(current_pool, topic_pool)
         question, reason = FisherService.choose_best_question(theta, candidate_pool)
         return question, reason, difficulty_gate, len(candidate_pool)
+
 
     def start_session(self, student_user_id: UUID, topic_id: UUID) -> dict:
         student = self._get_student(student_user_id)
@@ -123,6 +140,58 @@ class LearningSessionService:
         if not session:
             raise AppException("Learning session not found", "SESSION_NOT_FOUND", 404)
         return session
+
+    def get_current_question(self, session_id: UUID, student_user_id: UUID) -> dict:
+        student = self._get_student(student_user_id)
+        session = self.get_session(session_id)
+        if session.student_id != student.id:
+            raise AppException("Session does not belong to the current student", "FORBIDDEN", 403)
+        
+        if session.status == "completed":
+            return {"session": session, "question": None}
+
+        # Find the latest adaptive decision log for this session to see what question was selected
+        from sqlalchemy import select
+        from app.models.adaptive_decision_log import AdaptiveDecisionLog
+        
+        stmt = (
+            select(AdaptiveDecisionLog)
+            .where(AdaptiveDecisionLog.session_id == session_id)
+            .order_by(AdaptiveDecisionLog.created_at.desc())
+        )
+        decision = self.db.execute(stmt).scalars().first()
+        
+        question = None
+        if decision and decision.selected_question_id:
+            question = self.question_repo.get_question(decision.selected_question_id)
+            
+        # If no question was selected yet, select one (fallback)
+        if not question:
+            trait = self.irt_repo.get_trait(student.id, session.topic_id) or IRTService.initialize_trait(student.id, session.topic_id)
+            question, reason, difficulty_gate, pool_size = self._select_question(
+                session.topic_id, session.current_subtopic_id, session.id, trait.theta
+            )
+            # Log this decision
+            decision = AdaptiveDecisionLog(
+                student_id=student.id,
+                session_id=session.id,
+                topic_id=session.topic_id,
+                from_subtopic_id=None,
+                to_subtopic_id=session.current_subtopic_id,
+                navigation_action="stay",
+                difficulty_gate=",".join(difficulty_gate),
+                candidate_pool_size=pool_size,
+                selected_question_id=question.id if question else None,
+                selection_reason=reason,
+            )
+            self.decision_repo.create(decision)
+            self.db.commit()
+
+        return {
+            "session": session,
+            "question": self._serialize_student_question(question) if question else None
+        }
+
 
     def pause_session(self, session_id: UUID, student_user_id: UUID) -> LearningSession:
         student = self._get_student(student_user_id)
@@ -225,6 +294,12 @@ class LearningSessionService:
         self.bkt_repo.save(bkt_state)
         self.irt_repo.save(trait)
 
+        # Calculate correct and incorrect response counts for the current subtopic in this session
+        session_responses = self.response_repo.list_by_session(session.id)
+        subtopic_responses = [r for r in session_responses if r.subtopic_id == subtopic.id]
+        correct_count = sum(1 for r in subtopic_responses if r.is_correct)
+        incorrect_count = sum(1 for r in subtopic_responses if not r.is_correct)
+
         next_edges = self.topic_repo.list_next_edges(subtopic.id)
         prerequisites = self.topic_repo.list_prerequisites(subtopic.id)
         navigation_action = NavigationService.decide_action(
@@ -232,6 +307,8 @@ class LearningSessionService:
             mastery_threshold=subtopic.mastery_threshold,
             has_next_subtopic=bool(next_edges),
             has_prerequisite=bool(prerequisites),
+            correct_count=correct_count,
+            incorrect_count=incorrect_count,
         )
 
         target_subtopic_id = subtopic.id
@@ -241,9 +318,35 @@ class LearningSessionService:
             target_subtopic_id = prerequisites[0].source_subtopic_id
         session.current_subtopic_id = target_subtopic_id
 
-        next_question, reason, difficulty_gate, pool_size = self._select_question(
-            session.topic_id, target_subtopic_id, session.id, trait.theta
-        )
+        # ── IRT / count-based stopping rules ──────────────────────────────────
+        # The test ends when ANY of the following conditions are true:
+        #   1. theta >= +1.50  → student has reached the mastery ceiling
+        #   2. theta <= -1.50  → student is below the ability floor
+        #   3. questions answered >= 30  → hard question cap reached
+        stopping_reason: str | None = None
+        if trait.theta >= IRT_THETA_UPPER_THRESHOLD:
+            stopping_reason = (
+                f"Ability ceiling reached: theta={trait.theta:.3f} >= {IRT_THETA_UPPER_THRESHOLD}"
+            )
+        elif trait.theta <= IRT_THETA_LOWER_THRESHOLD:
+            stopping_reason = (
+                f"Ability floor reached: theta={trait.theta:.3f} <= {IRT_THETA_LOWER_THRESHOLD}"
+            )
+        elif session.total_questions_attempted >= SESSION_MAX_QUESTIONS:
+            stopping_reason = (
+                f"Question cap reached: {session.total_questions_attempted} >= {SESSION_MAX_QUESTIONS}"
+            )
+
+        if stopping_reason:
+            next_question, reason, difficulty_gate, pool_size = None, stopping_reason, [], 0
+            # Auto-complete the session — the test is done
+            session.status = SESSION_STATUS_COMPLETED
+            session.ended_at = datetime.utcnow()
+        else:
+            next_question, reason, difficulty_gate, pool_size = self._select_question(
+                session.topic_id, target_subtopic_id, session.id, trait.theta
+            )
+
         decision = AdaptiveDecisionLog(
             student_id=student.id,
             session_id=session.id,

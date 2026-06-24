@@ -11,11 +11,9 @@ interface Question {
   index: number;
   totalQuestions: number;
   text: string;
-  options: { key: "A" | "B" | "C" | "D"; text: string }[];
+  options: { key: "A" | "B" | "C" | "D"; text: string; is_correct?: boolean }[];
   skillBreadcrumb: { topic: string; skill: string };
-  grade: number;
   difficulty: Difficulty;
-  wordProblem: boolean;
   status: string;
   topic_id?: string;
   subtopic_id?: string;
@@ -46,6 +44,8 @@ export default function QBMQuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [topics, setTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("QBM Developer");
+  const [userAvatar, setUserAvatar] = useState("RK");
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,23 +65,44 @@ export default function QBMQuestionsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const topicsList = await api.get<any[]>("/api/v1/topics");
-      setTopics(topicsList || []);
+      const rawTopics = await api.get<any[]>("/api/v1/topics");
+      const topicsList = Array.isArray(rawTopics) ? rawTopics : [];
+      setTopics(topicsList);
       
-      const questionsList = await api.get<any[]>("/api/v1/questions");
+      const rawQuestions = await api.get<any[]>("/api/v1/questions");
+      const questionsList = Array.isArray(rawQuestions) ? rawQuestions : [];
 
       const topicsMap: Record<string, string> = {};
       topicsList.forEach(t => {
         topicsMap[t.id] = t.name;
       });
 
-      const activeQuestions = (questionsList || []).filter((q: any) => q.status !== "archived");
+      // Load subtopics for all topics to map subtopic names
+      const subtopicsMap: Record<string, string> = {};
+      await Promise.all(
+        topicsList.map(async (t: any) => {
+          try {
+            const subList = await api.get<any[]>(`/api/v1/topics/${t.id}/subtopics`);
+            const cleanSub = Array.isArray(subList) ? subList : [];
+            cleanSub.forEach((s: any) => {
+              subtopicsMap[s.id] = s.name;
+            });
+          } catch (e) {
+            console.error(`Failed to load subtopics for topic ${t.id}`, e);
+          }
+        })
+      );
+
+      const activeQuestions = questionsList.filter((q: any) => q.status !== "archived");
 
       const mapped: Question[] = activeQuestions.map((q: any, idx: number) => {
-        const optMapped = (q.options || []).map((o: any) => ({
-          key: o.option_label as "A" | "B" | "C" | "D",
-          text: o.option_text
-        }));
+        const optMapped = (Array.isArray(q.options) ? q.options : [])
+          .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          .map((o: any) => ({
+            key: o.option_label as "A" | "B" | "C" | "D",
+            text: o.option_text,
+            is_correct: o.is_correct
+          }));
         return {
           id: q.id,
           index: idx + 1,
@@ -90,11 +111,9 @@ export default function QBMQuestionsPage() {
           options: optMapped,
           skillBreadcrumb: {
             topic: topicsMap[q.topic_id] || "Mathematics",
-            skill: q.question_code || "General"
+            skill: q.subtopic_id ? subtopicsMap[q.subtopic_id] || q.question_code || "General" : q.question_code || "General"
           },
-          grade: 10,
           difficulty: (q.difficulty_level?.toLowerCase() || "easy") as Difficulty,
-          wordProblem: false,
           status: q.status,
           topic_id: q.topic_id,
           subtopic_id: q.subtopic_id
@@ -109,6 +128,14 @@ export default function QBMQuestionsPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+      if (user) {
+        setUserName(user.name || "QBM Developer");
+        setUserAvatar(user.avatar || "RK");
+      }
+    }
     loadData();
   }, []);
 
@@ -208,7 +235,7 @@ export default function QBMQuestionsPage() {
   });
 
   return (
-    <AppShell title="Question Bank Browser">
+    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Question Bank Browser">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button 
@@ -284,24 +311,22 @@ export default function QBMQuestionsPage() {
           </div>
         ) : (
           filtered.map((q, idx) => (
-            <div key={q.id} className="tp-card animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <span className="tp-badge tp-badge-neutral"><BookOpen size={12} style={{ marginRight: 2 }} /> {q.skillBreadcrumb.topic}</span>
-                  <span className="tp-badge tp-badge-neutral">{q.skillBreadcrumb.skill}</span>
-                  <span className={`tp-badge ${difficultyBadgeClass(q.difficulty)}`}>{difficultyLabel(q.difficulty)}</span>
-                </div>
-                <div style={{ display: "flex", gap: "0.35rem" }}>
+            <div key={q.id} className="tp-card animate-fade-in-up" style={{ padding: "1.25rem", animationDelay: `${idx * 0.05}s` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "0.75rem" }}>
+                <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9375rem", lineHeight: 1.45, margin: 0, flex: 1 }}>
+                  {q.text}
+                </p>
+                <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
                   <button 
                     onClick={() => {
                       setEditingQuestion(q);
                       setNewQuestionText(q.text);
                       setNewTopic(q.topic_id || "");
                       setNewDifficulty(q.difficulty);
-                      setOptA(q.options[0]?.text || "");
-                      setOptB(q.options[1]?.text || "");
-                      setOptC(q.options[2]?.text || "");
-                      setOptD(q.options[3]?.text || "");
+                      setOptA(q.options.find(o => o.key === "A")?.text || "");
+                      setOptB(q.options.find(o => o.key === "B")?.text || "");
+                      setOptC(q.options.find(o => o.key === "C")?.text || "");
+                      setOptD(q.options.find(o => o.key === "D")?.text || "");
                       const backendCorrectLabel = q.options.find((o: any) => o.is_correct)?.key || "A";
                       setCorrectOpt(backendCorrectLabel);
                       setIsModalOpen(true);
@@ -317,12 +342,9 @@ export default function QBMQuestionsPage() {
                   </button>
                 </div>
               </div>
-              <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9375rem", lineHeight: 1.5, marginBottom: "1rem" }}>
-                {q.text}
-              </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
                 {q.options.map(opt => (
-                  <div key={opt.key} style={{ display: "flex", gap: "0.5rem", padding: "0.5rem 0.75rem", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "0.8125rem", background: "var(--surface)" }}>
+                  <div key={opt.key} style={{ display: "flex", gap: "0.5rem", padding: "0.375rem 0.625rem", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "0.8125rem", background: "var(--surface)" }}>
                     <strong style={{ color: "var(--primary)" }}>{opt.key}:</strong>
                     <span>{opt.text}</span>
                   </div>

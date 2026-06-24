@@ -101,7 +101,7 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
     activeRole === "qbm" ? "Content Operations" :
     "System Administration"
   );
-  const [streakCount, setStreakCount] = useState(activeRole === "student" ? 0 : activeRole === "teacher" ? 8 : activeRole === "qbm" ? 6 : 15);
+  const [streakCount, setStreakCount] = useState(0);
   const [skillValue, setSkillValue] = useState(
     activeRole === "student" ? "Not Assessed" :
     activeRole === "teacher" ? "Mathematics" :
@@ -123,9 +123,49 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
       const fetchStudentAnalytics = (studentId: string) => {
         api.get<any>(`/api/v1/analytics/student/${studentId}`).then((res) => {
           if (res) {
-            setStreakCount(0); // Default to 0 streak on clean DB
             setSkillValue(res.accuracy >= 90 ? "Advanced" : res.accuracy >= 60 ? "Intermediate" : "Beginner");
             setOverallKnowledgeValue(`${Math.round(res.accuracy)}%`);
+
+            api.get<any[]>("/api/v1/learning/sessions").then((sessionsList) => {
+              const completedSessions = (Array.isArray(sessionsList) ? sessionsList : [])
+                .filter(s => s.status === "completed")
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+              let streak = 0;
+              if (completedSessions.length > 0) {
+                const dates = Array.from(new Set(
+                  completedSessions.map(s => new Date(s.ended_at || s.created_at).toDateString())
+                )).map(d => new Date(d));
+                dates.sort((a, b) => b.getTime() - a.getTime());
+
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                const mostRecent = dates[0];
+                mostRecent.setHours(0,0,0,0);
+
+                if (mostRecent.getTime() >= yesterday.getTime()) {
+                  streak = 1;
+                  let currentCompare = mostRecent;
+                  for (let i = 1; i < dates.length; i++) {
+                    const d = dates[i];
+                    d.setHours(0,0,0,0);
+                    const diffDays = Math.round((currentCompare.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) {
+                      streak++;
+                      currentCompare = d;
+                    } else if (diffDays > 1) {
+                      break;
+                    }
+                  }
+                }
+              }
+              setStreakCount(streak);
+              sessionStorage.setItem("tp_streak", String(streak));
+              window.dispatchEvent(new Event("storage"));
+            }).catch(console.error);
           }
         }).catch(console.error);
       };
@@ -133,17 +173,13 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
       if (user && user.student_id) {
         fetchStudentAnalytics(user.student_id);
       } else if (user && user.id) {
-        const completedKey = `completed_sessions_${user.id}`;
-        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
-        if (sessionIds.length > 0) {
-          api.get<any>(`/api/v1/learning/sessions/${sessionIds[0]}`).then((sess) => {
-            if (sess && sess.student_id) {
-              user.student_id = sess.student_id;
-              sessionStorage.setItem("tp_user", JSON.stringify(user));
-              fetchStudentAnalytics(sess.student_id);
-            }
-          }).catch(console.error);
-        }
+        api.get<any>("/api/v1/students/me").then((student) => {
+          if (student && student.id) {
+            user.student_id = student.id;
+            sessionStorage.setItem("tp_user", JSON.stringify(user));
+            fetchStudentAnalytics(student.id);
+          }
+        }).catch(console.error);
       }
     }
   }, [activeRole]);

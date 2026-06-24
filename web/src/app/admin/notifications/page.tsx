@@ -22,11 +22,7 @@ const TARGET_LABELS: Record<string, string> = {
   admin: "Admins"
 };
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  { id: "1", title: "New Institution Registered", desc: "Doon School has completed their platform registration.", time: "1 hour ago", type: "system", important: false, targets: ["admin"] },
-  { id: "2", title: "Question Bank Threshold Reached", desc: "Topic 'Arithmetic' has less than 15 active questions for Grade 10.", time: "3 hours ago", type: "assignment", important: false, targets: ["qbms"] },
-  { id: "3", title: "High Failure Rate Alert", desc: "Grade 9 Chemistry assessment has a high drop rate (average < 40%).", time: "1 day ago", type: "alert", important: true, targets: ["teachers", "admin"] },
-];
+const DEFAULT_NOTIFICATIONS: NotificationItem[] = [];
 
 const getInitialNotifications = () => {
   if (typeof window === "undefined") return DEFAULT_NOTIFICATIONS;
@@ -34,7 +30,10 @@ const getInitialNotifications = () => {
   if (!saved) return DEFAULT_NOTIFICATIONS;
 
   try {
-    return JSON.parse(saved) as NotificationItem[];
+    const parsed = JSON.parse(saved) as NotificationItem[];
+    return (Array.isArray(parsed) ? parsed : []).filter(n => {
+      return n && n.id && n.id !== "1" && n.id !== "2" && n.id !== "3" && !String(n.id).startsWith("n");
+    });
   } catch (err) {
     console.error("Failed to parse admin notifications", err);
     return DEFAULT_NOTIFICATIONS;

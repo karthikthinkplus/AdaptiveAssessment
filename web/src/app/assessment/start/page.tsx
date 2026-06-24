@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 interface BackendTopic {
   id: string;
   name: string;
+  difficulty_level?: string;
   grade?: string;
   subject?: string;
 }
@@ -19,19 +20,22 @@ export default function AssessmentStart() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [backendTopics, setBackendTopics] = useState<BackendTopic[]>([]);
   const [useMock, setUseMock] = useState(false);
-  const [authChecked] = useState(() =>
-    typeof window !== "undefined" && Boolean(sessionStorage.getItem("tp_logged_in"))
-  );
+  const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Auth guard — redirect to login if not logged in
   useEffect(() => {
-    if (!authChecked) {
+    setMounted(true);
+    const loggedIn = typeof window !== "undefined" && Boolean(sessionStorage.getItem("tp_logged_in"));
+    setAuthChecked(loggedIn);
+    if (!loggedIn) {
       router.replace("/login?next=assessment");
     }
-  }, [authChecked, router]);
+  }, [router]);
 
   // Load backend topics
   useEffect(() => {
+    if (!mounted || !authChecked) return;
     const fetchTopics = async () => {
       try {
         const list = await api.get<BackendTopic[]>("/api/v1/topics");
@@ -44,12 +48,10 @@ export default function AssessmentStart() {
         setUseMock(true);
       }
     };
-    if (authChecked) {
-      fetchTopics();
-    }
-  }, [authChecked]);
+    fetchTopics();
+  }, [mounted, authChecked]);
 
-  if (!authChecked) return null;
+  if (!mounted || !authChecked) return null;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -68,10 +70,55 @@ export default function AssessmentStart() {
       router.push("/assessment/session-001");
     } else {
       try {
+        // Map selected grade to a backend topic ID
+        let targetTopicId = "";
+        const num = grade.replace(/\D/g, ""); // "8", "9", "10"
+        
+        // 1. Look for difficulty level or name matches
+        const diffMap: Record<string, string> = {
+          "8": "easy",
+          "9": "medium",
+          "10": "hard"
+        };
+        const targetDiff = diffMap[num];
+        
+        let matchedTopic = backendTopics.find(t => 
+          t.difficulty_level === targetDiff || 
+          (t as any).difficulty === targetDiff
+        );
+        
+        if (!matchedTopic) {
+          matchedTopic = backendTopics.find(t => 
+            t.name.toLowerCase().includes(`grade ${num}`) || 
+            t.name.toLowerCase().includes(`class ${num}`)
+          );
+        }
+        
+        // 2. Fallback to Complement topics mapping
+        if (!matchedTopic) {
+          if (num === "8") {
+            matchedTopic = backendTopics.find(t => t.name.includes("10's Complement"));
+          } else if (num === "9") {
+            matchedTopic = backendTopics.find(t => t.name.includes("100's Complement"));
+          } else if (num === "10") {
+            matchedTopic = backendTopics.find(t => 
+              t.name.includes("Mixed Complement Applications") || 
+              t.name.includes("1000's Complement")
+            );
+          }
+        }
+        
+        // 3. Last resort fallback
+        const finalTopicId = matchedTopic ? matchedTopic.id : (backendTopics[0]?.id || "");
+        
+        if (!finalTopicId) {
+          throw new Error("No backend topics available to start assessment.");
+        }
+
         const response = await api.post<{
           session: { id: string; student_id: string };
           first_question: any;
-        }>("/api/v1/learning/sessions/start", { topic_id: grade });
+        }>("/api/v1/learning/sessions/start", { topic_id: finalTopicId });
 
         if (response.session && response.session.student_id) {
           const tpUser = sessionStorage.getItem("tp_user");
@@ -84,6 +131,10 @@ export default function AssessmentStart() {
               console.error("Failed to update user session with student_id", e);
             }
           }
+        }
+
+        if (response.first_question) {
+          sessionStorage.setItem("tp_current_question", JSON.stringify(response.first_question));
         }
 
         router.push(`/assessment/${response.session.id}`);
@@ -159,23 +210,10 @@ export default function AssessmentStart() {
                   onChange={e => setGrade(e.target.value)}
                   required
                 >
-                  <option value="" disabled>Choose a grade or topic...</option>
-                  {!useMock && backendTopics.length > 0 ? (
-                    <>
-                      {backendTopics.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}{t.grade || t.subject ? ` (${[t.grade, t.subject].filter(Boolean).join(" - ")})` : ""}
-                        </option>
-                      ))}
-                      <option value="mock-session">Mock Mode Fallback (Local Data)</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="8">Grade 8 (Algebra, Geometry, Arithmetic)</option>
-                      <option value="9">Grade 9 (Number Systems, Polynomials, Statistics)</option>
-                      <option value="10">Grade 10 (Real Numbers, Quadratics, Trigonometry)</option>
-                    </>
-                  )}
+                  <option value="" disabled>Choose a grade...</option>
+                  <option value="Grade 8">Grade 8 (Algebra, Geometry, Arithmetic)</option>
+                  <option value="Grade 9">Grade 9 (Number Systems, Polynomials, Statistics)</option>
+                  <option value="Grade 10">Grade 10 (Real Numbers, Quadratics, Trigonometry)</option>
                 </select>
                 {errors.grade && <p style={{ color: "var(--danger)", fontSize: "0.75rem", marginTop: "0.375rem" }}>{errors.grade}</p>}
               </div>

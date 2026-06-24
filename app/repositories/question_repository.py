@@ -56,7 +56,12 @@ class QuestionRepository:
         if subtopic_id:
             conditions.append(Question.subtopic_id == subtopic_id)
         if difficulty_levels:
-            conditions.append(Question.difficulty_level.in_(difficulty_levels))
+            # Map levels to both lowercase and title-case (e.g. 'easy' -> 'easy', 'Easy')
+            expanded = []
+            for d in difficulty_levels:
+                expanded.append(d.lower())
+                expanded.append(d.capitalize())
+            conditions.append(Question.difficulty_level.in_(expanded))
         if excluded_question_ids:
             conditions.append(not_(Question.id.in_(excluded_question_ids)))
         stmt = select(Question).options(joinedload(Question.options)).where(and_(*conditions))

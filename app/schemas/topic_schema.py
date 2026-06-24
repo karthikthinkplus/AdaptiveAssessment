@@ -27,5 +27,8 @@ class TopicRead(BaseModel):
     created_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
+    question_count: int = 0
+    active_sessions: int = 0
+    completed_sessions: int = 0
 
     model_config = {"from_attributes": True}

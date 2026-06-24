@@ -7,7 +7,7 @@ class PoolBuilderService:
         if theta < -0.5:
             return ["very easy", "easy", "medium"]
         if theta > 0.5:
-            return ["medium", "hard"]
+            return ["medium", "hard","very hard"]
         return ["easy", "medium", "hard"]
 
     @staticmethod

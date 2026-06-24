@@ -82,10 +82,30 @@ export default function Sidebar({ role = "student" }: SidebarProps) {
 
       {/* Footer */}
       <div style={{ borderTop: "1px solid var(--border)", padding: "0.75rem 0" }}>
-        <Link href="/login" className="tp-nav-item" style={{ color: "#F87171", textDecoration: "none" }}>
+        <button
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              sessionStorage.clear();
+              localStorage.removeItem("current_role");
+              window.location.href = "/login";
+            }
+          }}
+          className="tp-nav-item"
+          style={{
+            width: "100%",
+            background: "none",
+            border: "none",
+            textAlign: "left",
+            cursor: "pointer",
+            color: "#F87171",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+        >
           <LogOut size={18} style={{ stroke: "#F87171" }} />
           <span>Logout</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );

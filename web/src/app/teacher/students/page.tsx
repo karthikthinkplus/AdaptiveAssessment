@@ -117,7 +117,7 @@ export default function TeacherStudentsPage() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontWeight: 700, fontSize: "0.8rem"
                           }}>
-                            {s.name.split(" ").map(n => n[0]).join("")}
+                            {s.name.split(" ").map((n: string) => n[0]).join("")}
                           </div>
                           <div>
                             <div style={{ fontWeight: 600 }}>{s.name}</div>

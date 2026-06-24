@@ -14,7 +14,10 @@ const difficultyBadgeClass = (difficulty: string) => {
 
 export default function QBMDashboard() {
   const [questions, setQuestions] = useState<any[]>([]);
+  const [topics, setTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("QBM Developer");
+  const [userAvatar, setUserAvatar] = useState("RK");
 
   const loadQuestions = async () => {
     try {
@@ -28,11 +31,27 @@ export default function QBMDashboard() {
     }
   };
 
+  const loadTopics = async () => {
+    try {
+      const list = await api.get<any[]>("/api/v1/topics");
+      setTopics(list || []);
+    } catch (err) {
+      console.error("Failed to fetch topics on QBM dashboard", err);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("current_role", "qbm");
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+      if (user) {
+        setUserName(user.name || "QBM Developer");
+        setUserAvatar(user.avatar || "RK");
+      }
     }
     loadQuestions();
+    loadTopics();
   }, []);
 
   const handleAction = async (id: string, newStatus: "approved" | "rejected") => {
@@ -48,8 +67,10 @@ export default function QBMDashboard() {
   const approvedCount = questions.filter(q => q.status === "approved").length;
   const rejectedCount = questions.filter(q => q.status === "rejected").length;
 
+  const topicsMap = new Map((topics || []).map(t => [t.id, t.name]));
+
   return (
-    <AppShell role="qbm" userName="Ravi Kumar" userAvatar="RK" title="QBM Dashboard">
+    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="QBM Dashboard">
       {/* ── Action Buttons ────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", justifyContent: "flex-end" }}>
         <Link href="/qbm/upload" className="tp-btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>
@@ -103,7 +124,7 @@ export default function QBMDashboard() {
                 
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-                    <span className="tp-badge tp-badge-neutral">Math</span>
+                    <span className="tp-badge tp-badge-neutral">{topicsMap.get(q.topic_id) || "General"}</span>
                     <span className="tp-badge tp-badge-neutral"><Tag size={12} style={{ marginRight: 2 }} /> {q.question_code || "General"}</span>
                     <span className={`tp-badge ${difficultyBadgeClass(q.difficulty_level)}`}>{q.difficulty_level || "Medium"}</span>
                   </div>

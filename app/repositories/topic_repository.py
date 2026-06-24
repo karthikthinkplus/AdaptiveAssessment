@@ -1,9 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, func
 from sqlalchemy.orm import Session
 
 from app.models.knowledge_graph import KnowledgeGraphEdge
+from app.models.learning_session import LearningSession
+from app.models.question import Question
 from app.models.subtopic import Subtopic
 from app.models.topic import Topic
 
@@ -13,10 +15,90 @@ class TopicRepository:
         self.db = db
 
     def list_topics(self) -> list[Topic]:
-        return list(self.db.execute(select(Topic).order_by(Topic.display_order, Topic.name)).scalars().all())
+        q_sub = (
+            select(func.count(Question.id))
+            .where(Question.topic_id == Topic.id)
+            .scalar_subquery()
+        )
+        active_sub = (
+            select(func.count(LearningSession.id))
+            .where(
+                and_(
+                    LearningSession.topic_id == Topic.id,
+                    LearningSession.status == "active",
+                )
+            )
+            .scalar_subquery()
+        )
+        completed_sub = (
+            select(func.count(LearningSession.id))
+            .where(
+                and_(
+                    LearningSession.topic_id == Topic.id,
+                    LearningSession.status == "completed",
+                )
+            )
+            .scalar_subquery()
+        )
+
+        stmt = select(
+            Topic,
+            q_sub.label("question_count"),
+            active_sub.label("active_sessions"),
+            completed_sub.label("completed_sessions"),
+        ).order_by(Topic.display_order, Topic.name)
+
+        results = self.db.execute(stmt).all()
+        topics_with_stats = []
+        for topic, q_cnt, act_cnt, comp_cnt in results:
+            topic.question_count = q_cnt or 0
+            topic.active_sessions = act_cnt or 0
+            topic.completed_sessions = comp_cnt or 0
+            topics_with_stats.append(topic)
+        return topics_with_stats
 
     def get_topic(self, topic_id: UUID) -> Topic | None:
-        return self.db.get(Topic, topic_id)
+        q_sub = (
+            select(func.count(Question.id))
+            .where(Question.topic_id == Topic.id)
+            .scalar_subquery()
+        )
+        active_sub = (
+            select(func.count(LearningSession.id))
+            .where(
+                and_(
+                    LearningSession.topic_id == Topic.id,
+                    LearningSession.status == "active",
+                )
+            )
+            .scalar_subquery()
+        )
+        completed_sub = (
+            select(func.count(LearningSession.id))
+            .where(
+                and_(
+                    LearningSession.topic_id == Topic.id,
+                    LearningSession.status == "completed",
+                )
+            )
+            .scalar_subquery()
+        )
+
+        stmt = select(
+            Topic,
+            q_sub.label("question_count"),
+            active_sub.label("active_sessions"),
+            completed_sub.label("completed_sessions"),
+        ).where(Topic.id == topic_id)
+
+        result = self.db.execute(stmt).first()
+        if not result:
+            return None
+        topic, q_cnt, act_cnt, comp_cnt = result
+        topic.question_count = q_cnt or 0
+        topic.active_sessions = act_cnt or 0
+        topic.completed_sessions = comp_cnt or 0
+        return topic
 
     def get_topic_by_name(self, name: str) -> Topic | None:
         return self.db.execute(select(Topic).where(Topic.name == name)).scalar_one_or_none()

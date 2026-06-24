@@ -1,28 +1,45 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
 import { Upload, FileDown, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function QBMUploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [success, setSuccess] = useState(false);
+  const [userName, setUserName] = useState("QBM Developer");
+  const [userAvatar, setUserAvatar] = useState("RK");
 
-  const handleDownloadTemplate = () => {
-    const csvContent = 
-      "Question Text,Option A,Option B,Option C,Option D,Correct Answer,Topic,Difficulty\n" +
-      "\"Evaluate the polynomial P(x) = x^3 - 2x^2 + 5x - 7 at x = 2.\",\"1\",\"2\",\"3\",\"4\",\"C\",\"Algebra\",\"easy\"\n" +
-      "\"A train moves with a speed of 72 km/h. How many meters does it cover in 15 seconds?\",\"300\",\"400\",\"500\",\"600\",\"A\",\"Arithmetic\",\"very_hard\"\n";
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "thinkplus_questions_template.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+      if (user) {
+        setUserName(user.name || "QBM Developer");
+        setUserAvatar(user.avatar || "RK");
+      }
+    }
+  }, []);
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch("/api/v1/uploads/question-bank/template", {
+        headers: {
+          "Authorization": `Bearer ${sessionStorage.getItem("tp_token")}`
+        }
+      });
+      if (!response.ok) throw new Error("Failed to download template");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "question-bank-template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert("Error downloading template: " + err.message);
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -40,28 +57,58 @@ export default function QBMUploadPage() {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile.name.endsWith(".xlsx")) {
+        setFile(droppedFile);
+      } else {
+        alert("Only .xlsx files are supported by the backend");
+      }
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      if (selectedFile.name.endsWith(".xlsx")) {
+        setFile(selectedFile);
+      } else {
+        alert("Only .xlsx files are supported by the backend");
+      }
     }
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    setSuccess(true);
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/v1/uploads/question-bank", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sessionStorage.getItem("tp_token")}`
+        },
+        body: formData
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.message || "Failed to upload file");
+      }
+
+      setSuccess(true);
       setFile(null);
-      setSuccess(false);
-    }, 2500);
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    }
   };
 
   return (
-    <AppShell title="Bulk Upload Questions">
+    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Bulk Upload Questions">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button 
@@ -99,7 +146,7 @@ export default function QBMUploadPage() {
                 transition: "all 0.2s ease"
               }}
             >
-              <input type="file" id="file-upload" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={handleFileChange} />
+              <input type="file" id="file-upload" accept=".xlsx" style={{ display: "none" }} onChange={handleFileChange} />
               <label htmlFor="file-upload" style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
                 <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)" }}>
                   <Upload size={22} />
@@ -108,7 +155,7 @@ export default function QBMUploadPage() {
                   <span style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.9375rem" }}>Click to upload</span> or drag and drop
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                  Supports CSV, XLSX up to 10MB
+                  Supports XLSX up to 10MB
                 </div>
               </label>
             </div>
@@ -135,10 +182,9 @@ export default function QBMUploadPage() {
             <AlertCircle size={16} color="var(--primary)" /> Guidelines
           </h3>
           <ul style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "1.25rem", margin: 0, lineHeight: 1.5 }}>
-            <li>Template has 7 headers: <code>Question Text</code>, <code>Option A</code>, <code>Option B</code>, <code>Option C</code>, <code>Option D</code>, <code>Correct Answer</code>, <code>Topic</code>.</li>
-            <li>Do not modify, reorder or add columns to headers.</li>
+            <li>Please use the downloaded active template file (.xlsx format only).</li>
             <li>Allowed difficulties: <code>very_easy</code>, <code>easy</code>, <code>medium</code>, <code>hard</code>, <code>very_hard</code>.</li>
-            <li>Ensure correct answer option matches the key (A, B, C, or D).</li>
+            <li>Ensure correct answer matches standard column formats (A, B, C, D, or E).</li>
           </ul>
         </div>
       </div>

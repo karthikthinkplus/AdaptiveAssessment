@@ -11,7 +11,8 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 type CurriculumStatus = "Draft" | "Saved" | "Published";
 
@@ -38,71 +39,7 @@ type TopicDependency = {
   status: CurriculumStatus;
 };
 
-const INITIAL_TOPICS: Topic[] = [
-  {
-    id: "algebra",
-    name: "Algebra",
-    subject: "Mathematics",
-    grade: "Grade 10",
-    status: "Published",
-    subtopics: [
-      { id: "linear-equations", name: "Linear Equations", status: "Published" },
-      { id: "polynomial-evaluation", name: "Polynomial Evaluation", status: "Published" },
-      { id: "quadratic-equations", name: "Quadratic Equations", status: "Saved" },
-    ],
-  },
-  {
-    id: "arithmetic",
-    name: "Arithmetic",
-    subject: "Mathematics",
-    grade: "Grade 9",
-    status: "Published",
-    subtopics: [
-      { id: "percentage-and-ratio", name: "Percentage and Ratio", status: "Published" },
-      { id: "speed-distance-and-time", name: "Speed, Distance and Time", status: "Published" },
-    ],
-  },
-  {
-    id: "geometry",
-    name: "Geometry",
-    subject: "Mathematics",
-    grade: "Grade 8",
-    status: "Draft",
-    subtopics: [
-      { id: "area-and-perimeter", name: "Area and Perimeter", status: "Draft" },
-      { id: "triangles", name: "Triangles", status: "Draft" },
-      { id: "coordinate-geometry", name: "Coordinate Geometry", status: "Saved" },
-    ],
-  },
-  {
-    id: "trigonometry",
-    name: "Trigonometry",
-    subject: "Mathematics",
-    grade: "Grade 10",
-    status: "Draft",
-    subtopics: [
-      { id: "trigonometric-ratios", name: "Trigonometric Ratios", status: "Draft" },
-      { id: "heights-and-distances", name: "Heights and Distances", status: "Draft" },
-    ],
-  },
-];
 
-const INITIAL_DEPENDENCIES: TopicDependency[] = [
-  {
-    id: "dep-1",
-    beforeTopicId: "arithmetic",
-    afterTopicId: "algebra",
-    reason: "Students need operations, percentages, and ratio fluency before equations.",
-    status: "Published",
-  },
-  {
-    id: "dep-2",
-    beforeTopicId: "geometry",
-    afterTopicId: "trigonometry",
-    reason: "Angle, triangle, and measurement concepts support trigonometric ratios.",
-    status: "Saved",
-  },
-];
 
 const slugify = (value: string) =>
   value
@@ -119,19 +56,93 @@ const statusBadgeClass = (status: CurriculumStatus) =>
       : "tp-badge-neutral";
 
 export default function QBMCurriculumPage() {
-  const [topics, setTopics] = useState<Topic[]>(INITIAL_TOPICS);
-  const [dependencies, setDependencies] = useState<TopicDependency[]>(INITIAL_DEPENDENCIES);
-  const [selectedTopicId, setSelectedTopicId] = useState(INITIAL_TOPICS[0].id);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [dependencies, setDependencies] = useState<TopicDependency[]>([]);
+  const [selectedTopicId, setSelectedTopicId] = useState("");
   const [topicName, setTopicName] = useState("");
   const [subject, setSubject] = useState("Mathematics");
   const [grade, setGrade] = useState("Grade 10");
   const [subtopicName, setSubtopicName] = useState("");
-  const [beforeTopicId, setBeforeTopicId] = useState(INITIAL_TOPICS[1].id);
-  const [afterTopicId, setAfterTopicId] = useState(INITIAL_TOPICS[0].id);
+  const [beforeTopicId, setBeforeTopicId] = useState("");
+  const [afterTopicId, setAfterTopicId] = useState("");
   const [reason, setReason] = useState("");
   const [notice, setNotice] = useState("Draft curriculum changes are not published until you save and publish them.");
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("QBM Developer");
+  const [userAvatar, setUserAvatar] = useState("RK");
 
-  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const list = await api.get<any[]>("/api/v1/topics");
+      const cleanList = Array.isArray(list) ? list : [];
+      const mapped = await Promise.all(cleanList.map(async (t: any) => {
+        const subList = await api.get<any[]>(`/api/v1/topics/${t.id}/subtopics`);
+        const cleanSub = Array.isArray(subList) ? subList : [];
+        return {
+          id: t.id,
+          name: t.name,
+          subject: "Mathematics",
+          grade: t.difficulty_level === "easy" ? "Grade 8" : t.difficulty_level === "medium" ? "Grade 9" : "Grade 10",
+          status: (t.is_active ? "Published" : "Draft") as CurriculumStatus,
+          subtopics: cleanSub.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            status: (s.is_active ? "Published" : "Draft") as CurriculumStatus
+          }))
+        };
+      }));
+      setTopics(mapped);
+      if (mapped.length > 0) {
+        setSelectedTopicId(mapped[0].id);
+        setBeforeTopicId(mapped[0].id);
+        if (mapped.length > 1) {
+          setAfterTopicId(mapped[1].id);
+        } else {
+          setAfterTopicId(mapped[0].id);
+        }
+      }
+      
+      const savedDeps = localStorage.getItem("tp_topic_dependencies");
+      if (savedDeps) {
+        try {
+          const parsed = JSON.parse(savedDeps) as TopicDependency[];
+          const topicIds = new Set(mapped.map((t: any) => t.id));
+          const validDeps = parsed.filter(d => topicIds.has(d.beforeTopicId) && topicIds.has(d.afterTopicId));
+          setDependencies(validDeps);
+          localStorage.setItem("tp_topic_dependencies", JSON.stringify(validDeps));
+        } catch (err) {
+          console.error("Failed to parse topic dependencies", err);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load curriculum data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tpUser = sessionStorage.getItem("tp_user");
+      const user = tpUser ? JSON.parse(tpUser) : null;
+      if (user) {
+        setUserName(user.name || "QBM Developer");
+        setUserAvatar(user.avatar || "RK");
+      }
+    }
+    loadData();
+  }, []);
+
+  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0] ?? {
+    id: "",
+    name: "No Topic Selected",
+    subject: "Mathematics",
+    grade: "Grade 10",
+    status: "Draft" as CurriculumStatus,
+    subtopics: []
+  };
+
   const topicLookup = useMemo(
     () => new Map(topics.map((topic) => [topic.id, topic])),
     [topics]
@@ -148,131 +159,74 @@ export default function QBMCurriculumPage() {
     return topicIds;
   }, [publishableDependencies]);
 
-  const handleSaveTopic = (event: React.FormEvent) => {
+  const handleSaveTopic = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedName = topicName.trim();
     if (!trimmedName) return;
 
-    const baseId = slugify(trimmedName);
-    const id = topics.some((topic) => topic.id === baseId)
-      ? `${baseId}-${topics.length + 1}`
-      : baseId;
-
-    const newTopic: Topic = {
-      id,
-      name: trimmedName,
-      subject,
-      grade,
-      status: "Saved",
-      subtopics: [],
-    };
-
-    setTopics((current) => [...current, newTopic]);
-    setSelectedTopicId(id);
-    setTopicName("");
-    setNotice(`${trimmedName} saved as a topic. Add subtopics or link it before publishing.`);
+    try {
+      const payload = {
+        name: trimmedName,
+        difficulty_level: grade === "Grade 8" ? "easy" : grade === "Grade 9" ? "medium" : "hard",
+        display_order: topics.length + 1,
+        is_active: true
+      };
+      const created = await api.post<any>("/api/v1/topics", payload);
+      setNotice(`${trimmedName} saved as a topic in database.`);
+      setTopicName("");
+      await loadData();
+      setSelectedTopicId(created.id);
+    } catch (err: any) {
+      alert("Failed to save topic: " + err.message);
+    }
   };
 
-  const handleSaveSubtopic = (event: React.FormEvent) => {
+  const handleSaveSubtopic = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedName = subtopicName.trim();
-    if (!trimmedName || !selectedTopic) return;
-    const baseId = slugify(trimmedName);
-    const id = selectedTopic.subtopics.some((subtopic) => subtopic.id === baseId)
-      ? `${baseId}-${selectedTopic.subtopics.length + 1}`
-      : baseId;
+    if (!trimmedName || !selectedTopicId) return;
 
-    setTopics((current) =>
-      current.map((topic) =>
-        topic.id === selectedTopic.id
-          ? {
-              ...topic,
-              status: topic.status === "Published" ? "Published" : "Saved",
-              subtopics: [...topic.subtopics, { id, name: trimmedName, status: "Saved" }],
-            }
-          : topic
-      )
-    );
-    setSubtopicName("");
-    setNotice(`${trimmedName} saved under ${selectedTopic.name}.`);
+    try {
+      const payload = {
+        name: trimmedName,
+        description: "",
+        difficulty_level: "medium",
+        display_order: selectedTopic.subtopics.length + 1,
+        mastery_threshold: 0.85,
+        is_active: true
+      };
+      await api.post(`/api/v1/topics/${selectedTopicId}/subtopics`, payload);
+      setNotice(`${trimmedName} saved under ${selectedTopic.name} in database.`);
+      setSubtopicName("");
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to save subtopic: " + err.message);
+    }
   };
 
   const handleDeleteSubtopic = (subtopicId: string) => {
     if (!selectedTopic) return;
-    const subtopicNameToDelete = selectedTopic.subtopics.find((subtopic) => subtopic.id === subtopicId)?.name;
-
+    setNotice("Deleting subtopic is not supported by backend. Status updated to draft locally.");
     setTopics((current) =>
       current.map((topic) =>
         topic.id === selectedTopic.id
           ? {
               ...topic,
-              status: topic.status === "Published" ? "Published" : "Saved",
-              subtopics: topic.subtopics.filter((subtopic) => subtopic.id !== subtopicId),
+              subtopics: topic.subtopics.map(s => s.id === subtopicId ? { ...s, status: "Draft" } : s)
             }
           : topic
       )
     );
-    setNotice(`${subtopicNameToDelete ?? "Subtopic"} deleted from ${selectedTopic.name}.`);
   };
 
-  const handleDeleteTopic = (topicId: string) => {
-    const topicToDelete = topics.find((topic) => topic.id === topicId);
-    if (!topicToDelete) return;
-
-    const remainingTopics = topics.filter((topic) => topic.id !== topicId);
-    if (remainingTopics.length === 0) {
-      setNotice("At least one topic must remain in the curriculum map.");
-      return;
+  const handleDeleteTopic = async (topicId: string) => {
+    try {
+      await api.patch(`/api/v1/topics/${topicId}`, { is_active: false });
+      setNotice(`Topic deactivated in database.`);
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to delete topic: " + err.message);
     }
-
-    const incoming = dependencies.filter((dependency) => dependency.afterTopicId === topicId);
-    const outgoing = dependencies.filter((dependency) => dependency.beforeTopicId === topicId);
-    const retainedDependencies = dependencies.filter(
-      (dependency) => dependency.beforeTopicId !== topicId && dependency.afterTopicId !== topicId
-    );
-    const bridgedDependencies: TopicDependency[] = [];
-
-    incoming.forEach((previousDependency) => {
-      outgoing.forEach((nextDependency) => {
-        if (previousDependency.beforeTopicId === nextDependency.afterTopicId) return;
-
-        const alreadyLinked = [...retainedDependencies, ...bridgedDependencies].some(
-          (dependency) =>
-            dependency.beforeTopicId === previousDependency.beforeTopicId &&
-            dependency.afterTopicId === nextDependency.afterTopicId
-        );
-        if (alreadyLinked) return;
-
-        const beforeTopic = topics.find((topic) => topic.id === previousDependency.beforeTopicId);
-        const afterTopic = topics.find((topic) => topic.id === nextDependency.afterTopicId);
-
-        bridgedDependencies.push({
-          id: `dep-bridge-${Date.now()}-${bridgedDependencies.length}`,
-          beforeTopicId: previousDependency.beforeTopicId,
-          afterTopicId: nextDependency.afterTopicId,
-          reason: `Auto-linked after deleting ${topicToDelete.name}: ${beforeTopic?.name ?? "Previous topic"} now leads to ${afterTopic?.name ?? "next topic"}.`,
-          status: "Saved",
-        });
-      });
-    });
-
-    setTopics(remainingTopics);
-    setDependencies([...retainedDependencies, ...bridgedDependencies]);
-
-    if (selectedTopicId === topicId) {
-      setSelectedTopicId(remainingTopics[0]?.id ?? "");
-    }
-    if (beforeTopicId === topicId) {
-      setBeforeTopicId(remainingTopics[0]?.id ?? "");
-    }
-    if (afterTopicId === topicId) {
-      setAfterTopicId(remainingTopics[1]?.id ?? remainingTopics[0]?.id ?? "");
-    }
-
-    const bridgeMessage = bridgedDependencies.length
-      ? ` Previous and next topics were re-linked in ${bridgedDependencies.length} saved learning link${bridgedDependencies.length > 1 ? "s" : ""}.`
-      : " Related learning links were removed.";
-    setNotice(`${topicToDelete.name} and its ${topicToDelete.subtopics.length} subtopic${topicToDelete.subtopics.length === 1 ? "" : "s"} deleted.${bridgeMessage}`);
   };
 
   const handleSaveDependency = (event: React.FormEvent) => {
@@ -292,38 +246,24 @@ export default function QBMCurriculumPage() {
       return;
     }
 
-    setDependencies((current) => [
-      ...current,
+    const updated = [
+      ...dependencies,
       {
         id: `dep-${Date.now()}`,
         beforeTopicId,
         afterTopicId,
         reason: reason.trim() || "Prerequisite relationship added by QBM.",
-        status: "Saved",
+        status: "Saved" as CurriculumStatus,
       },
-    ]);
+    ];
+    setDependencies(updated);
+    localStorage.setItem("tp_topic_dependencies", JSON.stringify(updated));
     setReason("");
-    setNotice("Learning link saved. It can now be published with its linked topics.");
+    setNotice("Learning link saved to local draft map.");
   };
 
   const handleSaveMap = () => {
-    setTopics((current) =>
-      current.map((topic) => ({
-        ...topic,
-        status: topic.status === "Published" ? "Published" : "Saved",
-        subtopics: topic.subtopics.map((subtopic) => ({
-          ...subtopic,
-          status: subtopic.status === "Published" ? "Published" : "Saved",
-        })),
-      }))
-    );
-    setDependencies((current) =>
-      current.map((dependency) => ({
-        ...dependency,
-        status: dependency.status === "Published" ? "Published" : "Saved",
-      }))
-    );
-    setNotice("All draft topics, subtopics, and learning links are saved.");
+    setNotice("All draft learning links are saved locally.");
   };
 
   const handlePublishLinkedMap = () => {
@@ -331,27 +271,10 @@ export default function QBMCurriculumPage() {
       setNotice("Save at least one learning link before publishing.");
       return;
     }
-
-    setTopics((current) =>
-      current.map((topic) =>
-        linkedSavedTopicIds.has(topic.id)
-          ? {
-              ...topic,
-              status: "Published",
-              subtopics: topic.subtopics.map((subtopic) => ({
-                ...subtopic,
-                status: subtopic.status === "Saved" ? "Published" : subtopic.status,
-              })),
-            }
-          : topic
-      )
+    setDependencies(current =>
+      current.map(d => d.status === "Saved" ? { ...d, status: "Published" } : d)
     );
-    setDependencies((current) =>
-      current.map((dependency) =>
-        dependency.status === "Saved" ? { ...dependency, status: "Published" } : dependency
-      )
-    );
-    setNotice("Published saved learning links with their linked topics and saved subtopics.");
+    setNotice("Published saved learning links locally.");
   };
 
   const stats = [
@@ -374,7 +297,7 @@ export default function QBMCurriculumPage() {
   ];
 
   return (
-    <AppShell role="qbm" userName="Ravi Kumar" userAvatar="RK" title="Curriculum Map">
+    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Curriculum Map">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: "1.375rem", fontWeight: 700 }}>

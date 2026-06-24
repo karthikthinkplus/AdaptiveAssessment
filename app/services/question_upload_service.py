@@ -21,6 +21,7 @@ class QuestionUploadService:
         "q_no": "question_code",
         "question_code": "question_code",
         "topic": "topic",
+        "complement_question": "topic",
         "topic_name": "topic",
         "sub_topic": "subtopic",
         "subtopic": "subtopic",

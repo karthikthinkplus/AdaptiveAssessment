@@ -81,115 +81,127 @@ export default function DiagnosticReport() {
         setStudentGrade(user.institution ? `${user.grade || "Grade 8"} - ${user.institution}` : (user.grade || "Grade 8"));
       }
 
-      if (user && user.id) {
-        const completedKey = `completed_sessions_${user.id}`;
-        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
-        
-        if (sessionIds.length > 0) {
-          Promise.all(sessionIds.slice(0, 3).map(async (sessId) => {
-            try {
-              const [analytics, details] = await Promise.all([
-                api.get<any>(`/api/v1/analytics/session/${sessId}`),
-                api.get<any>(`/api/v1/learning/sessions/${sessId}`)
-              ]);
-              const dateStr = details?.created_at ? new Date(details.created_at).toLocaleDateString() : new Date().toLocaleDateString();
-              const score = Math.round(analytics.accuracy);
-              return {
-                name: "Math Adaptive Test",
-                date: dateStr,
-                score,
-                sessionId: sessId,
-                subject: "Math"
-              };
-            } catch (err) {
-              console.error("Failed to load details for recent report", sessId, err);
-              return null;
-            }
-          })).then((results) => {
-            setRecentReports(results.filter(Boolean));
-          });
-        }
-      }
+      api.get<any[]>("/api/v1/topics").then((topicsList) => {
+        const topicsMap = new Map((topicsList || []).map(t => [t.id, t.name]));
 
-      if (!isMock) {
-        api.get<any>(`/api/v1/analytics/session/${sessionId}`).then((res) => {
-          if (res) {
-            setOverallScore(Math.round(res.accuracy));
-            setGradeEquivalent(
-              res.accuracy >= 90
-                ? "Grade 10 Advanced"
-                : res.accuracy >= 60
-                  ? "Grade 10 Standard"
-                  : "Grade 9 Remedial"
-            );
-            setAnswerOutcomes({
-              correct: res.total_correct,
-              wrong: Math.max(0, res.total_questions_attempted - res.total_correct),
-              guesses: 0,
-            });
+        api.get<any>("/api/v1/students/me").then((student) => {
+          if (student && student.id) {
+            api.get<any[]>("/api/v1/learning/sessions").then((sessionsList) => {
+              const completedSessions = (Array.isArray(sessionsList) ? sessionsList : [])
+                .filter(s => s.status === "completed" && s.id !== sessionId)
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-            // Fetch the session details to get average time
-            api.get<any>(`/api/v1/learning/sessions/${sessionId}`).then((sess) => {
-              if (sess) {
-                if (sess.total_questions_attempted > 0) {
-                  setAverageTimePerQuestion(Math.max(1, Math.round(sess.total_time_seconds / sess.total_questions_attempted)));
+              Promise.all(completedSessions.slice(0, 3).map(async (sess) => {
+                try {
+                  const analytics = await api.get<any>(`/api/v1/analytics/session/${sess.id}`);
+                  const dateStr = sess.created_at ? new Date(sess.created_at).toLocaleDateString() : new Date().toLocaleDateString();
+                  const score = Math.round(analytics.accuracy);
+                  return {
+                    name: topicsMap.get(sess.topic_id) || "Math Adaptive Test",
+                    date: dateStr,
+                    score,
+                    sessionId: sess.id,
+                    subject: "Mathematics"
+                  };
+                } catch (err) {
+                  console.error("Failed to load details for recent report", sess.id, err);
+                  return null;
                 }
-                const studentId = sess.student_id;
-                if (studentId) {
-                  const tpUser = sessionStorage.getItem("tp_user");
-                  if (tpUser) {
-                    try {
-                      const parsed = JSON.parse(tpUser);
-                      if (!parsed.student_id) {
-                        parsed.student_id = studentId;
-                        sessionStorage.setItem("tp_user", JSON.stringify(parsed));
-                        setStudentGrade(parsed.institution ? `${parsed.grade || "Grade 8"} - ${parsed.institution}` : (parsed.grade || "Grade 8"));
-                      }
-                    } catch (e) {
-                      console.error("Failed to save student_id from session", e);
-                    }
-                  }
-
-                  // Fetch the student's IRT trait or BKT states to populate masteryData
-                  api.get<any[]>(`/api/v1/adaptive/students/${studentId}/irt`).then((traits) => {
-                    if (traits && traits.length > 0) {
-                      const mappedPerformance = traits.map((t: any) => ({
-                        topic: "Mathematics",
-                        score: Math.min(100, Math.max(0, Math.round((t.theta + 3) / 6 * 100)))
-                      }));
-                      setTopicPerformance(mappedPerformance);
-                      setAbilityTheta(traits[0].theta);
-                    }
-                  }).catch(console.error);
-
-                  api.get<any[]>(`/api/v1/adaptive/students/${studentId}/bkt`).then((bkts) => {
-                    if (bkts && bkts.length > 0) {
-                      const mappedMastery = bkts.map((b: any) => ({
-                        skill: `Subtopic Mastery`,
-                        topic: "Mathematics",
-                        mastery: b.p_mastery,
-                        label: getMasteryLabel(b.p_mastery)
-                      }));
-                      setMasteryData(mappedMastery);
-                    }
-                  }).catch(console.error);
-                }
-              }
+              })).then((results) => {
+                setRecentReports(results.filter(Boolean));
+              });
             }).catch(console.error);
           }
-        }).catch((err) => {
-          console.error("Failed to load backend session analytics, using default mock fallback", err);
+        }).catch(console.error);
+
+        if (!isMock) {
+          api.get<any>(`/api/v1/analytics/session/${sessionId}`).then((res) => {
+            if (res) {
+              setOverallScore(Math.round(res.accuracy));
+              setGradeEquivalent(
+                res.accuracy >= 90
+                  ? "Grade 10 Advanced"
+                  : res.accuracy >= 60
+                    ? "Grade 10 Standard"
+                    : "Grade 9 Remedial"
+              );
+              setAnswerOutcomes({
+                correct: res.total_correct,
+                wrong: Math.max(0, res.total_questions_attempted - res.total_correct),
+                guesses: 0,
+              });
+
+              // Fetch the session details to get average time
+              api.get<any>(`/api/v1/learning/sessions/${sessionId}`).then((sess) => {
+                if (sess) {
+                  if (sess.total_questions_attempted > 0) {
+                    setAverageTimePerQuestion(Math.max(1, Math.round(sess.total_time_seconds / sess.total_questions_attempted)));
+                  }
+                  const studentId = sess.student_id;
+                  if (studentId) {
+                    const tpUser = sessionStorage.getItem("tp_user");
+                    if (tpUser) {
+                      try {
+                        const parsed = JSON.parse(tpUser);
+                        if (!parsed.student_id) {
+                          parsed.student_id = studentId;
+                          sessionStorage.setItem("tp_user", JSON.stringify(parsed));
+                          setStudentGrade(parsed.institution ? `${parsed.grade || "Grade 8"} - ${parsed.institution}` : (parsed.grade || "Grade 8"));
+                        }
+                      } catch (e) {
+                        console.error("Failed to save student_id from session", e);
+                      }
+                    }
+
+                    // Fetch topics to map IRT traits
+                    api.get<any[]>(`/api/v1/adaptive/students/${studentId}/irt`).then((traits) => {
+                      if (traits && traits.length > 0) {
+                        const mappedPerformance = traits.map((t: any) => ({
+                          topic: topicsMap.get(t.topic_id) || "Mathematics",
+                          score: Math.min(100, Math.max(0, Math.round((t.theta + 3) / 6 * 100)))
+                        }));
+                        setTopicPerformance(mappedPerformance);
+                        setAbilityTheta(traits[0].theta);
+                      }
+                    }).catch(console.error);
+
+                    // Fetch subtopics for this topic to map BKT states
+                    api.get<any[]>(`/api/v1/topics/${sess.topic_id}/subtopics`).then((subtopicsList) => {
+                      const subtopicsMap = new Map((subtopicsList || []).map(s => [s.id, s.name]));
+
+                      api.get<any[]>(`/api/v1/adaptive/students/${studentId}/bkt`).then((bkts) => {
+                        if (bkts && bkts.length > 0) {
+                          const mappedMastery = bkts.map((b: any) => ({
+                            skill: subtopicsMap.get(b.subtopic_id) || "Subtopic Mastery",
+                            topic: topicsMap.get(sess.topic_id) || "Mathematics",
+                            mastery: b.p_mastery,
+                            label: getMasteryLabel(b.p_mastery)
+                          }));
+                          setMasteryData(mappedMastery);
+                        }
+                      }).catch(console.error);
+                    }).catch(console.error);
+                  }
+                }
+              }).catch(console.error);
+            }
+          }).catch((err) => {
+            console.error("Failed to load backend session analytics, using default mock fallback", err);
+            loadMockStats();
+          });
+        } else {
           loadMockStats();
-        });
-      } else {
+          // Load mock recent reports
+          setRecentReports([
+            { name: "Math Adaptive Test", date: "May 12, 2026", score: overallScore, sessionId: "session-001", subject: "Math" },
+            { name: "Number Theory Quiz", date: "Apr 28, 2026", score: 76, sessionId: "session-002", subject: "Math" },
+            { name: "Chemistry Practice", date: "May 20, 2026", score: 85, sessionId: "session-003", subject: "Chemistry" }
+          ]);
+        }
+      }).catch((err) => {
+        console.error("Failed to load topics", err);
         loadMockStats();
-        // Load mock recent reports
-        setRecentReports([
-          { name: "Math Adaptive Test", date: "May 12, 2026", score: overallScore, sessionId: "session-001", subject: "Math" },
-          { name: "Number Theory Quiz", date: "Apr 28, 2026", score: 76, sessionId: "session-002", subject: "Math" },
-          { name: "Chemistry Practice", date: "May 20, 2026", score: 85, sessionId: "session-003", subject: "Chemistry" }
-        ]);
-      }
+      });
 
       function loadMockStats() {
         const savedAnswers = localStorage.getItem(`assessment_answers_${sessionId}`) || 

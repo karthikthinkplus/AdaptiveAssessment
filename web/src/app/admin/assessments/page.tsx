@@ -11,17 +11,13 @@ export default function AdminAssessmentsPage() {
   useEffect(() => {
     api.get<any[]>("/api/v1/topics").then((list) => {
       const mapped = (list || []).map((topic: any) => {
-        const isGrade9 = topic.name.toLowerCase().includes("grade 9") || topic.name.toLowerCase().includes("class 9");
-        const isGrade8 = topic.name.toLowerCase().includes("grade 8") || topic.name.toLowerCase().includes("class 8");
-        const grade = isGrade9 ? "Grade 9" : isGrade8 ? "Grade 8" : "Grade 10";
-
         return {
           id: topic.id,
           title: topic.name,
-          subject: "Math",
-          questions: 15,
-          activeSessions: 0,
-          completed: 0,
+          subject: "Mathematics",
+          questions: topic.question_count ?? 0,
+          activeSessions: topic.active_sessions ?? 0,
+          completed: topic.completed_sessions ?? 0,
           status: topic.is_active ? "Active" : "Archived"
         };
       });

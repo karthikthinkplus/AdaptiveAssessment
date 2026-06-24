@@ -6,10 +6,24 @@ from sqlalchemy.orm import Session
 from app.core.permissions import require_roles
 from app.database.session import get_db
 from app.exceptions import success_response
-from app.schemas.learning_schema import StartSessionRequest, SubmitAnswerRequest
+from app.schemas.learning_schema import StartSessionRequest, SubmitAnswerRequest, LearningSessionRead
 from app.services.learning_session_service import LearningSessionService
 
 router = APIRouter(prefix="/learning", tags=["learning"])
+
+
+@router.get("/sessions")
+def list_student_sessions(
+    current_user=Depends(require_roles(["student"])),
+    db: Session = Depends(get_db),
+):
+    student = LearningSessionService(db)._get_student(current_user.id)
+    sessions = LearningSessionService(db).session_repo.list_by_student(student.id)
+    return success_response(
+        "Learning sessions fetched successfully",
+        [LearningSessionRead.model_validate(s).model_dump(mode="json") for s in sessions]
+    )
+
 
 
 @router.post("/sessions/start")
@@ -57,6 +71,23 @@ def get_session(
 ):
     session = LearningSessionService(db).get_session(session_id)
     return success_response("Learning session fetched successfully", session)
+
+
+@router.get("/sessions/{session_id}/current-question")
+def get_current_question(
+    session_id: UUID,
+    current_user=Depends(require_roles(["student"])),
+    db: Session = Depends(get_db),
+):
+    result = LearningSessionService(db).get_current_question(session_id, current_user.id)
+    return success_response(
+        "Current question fetched successfully",
+        {
+            "session": result["session"],
+            "question": result["question"],
+        }
+    )
+
 
 
 @router.post("/sessions/{session_id}/pause")

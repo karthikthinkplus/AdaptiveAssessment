@@ -4,14 +4,17 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import Link from "next/link";
 import { ArrowRight, Eye, AlertTriangle } from "lucide-react";
+import AppShell from "@/components/layout/AppShell";
+import SimpleBarChart from "@/components/charts/SimpleBarChart";
 
 export default function StudentDashboard() {
   const [hasAssessments, setHasAssessments] = useState(false);
+  const [topicsCount, setTopicsCount] = useState(0);
   const [stats, setStats] = useState({
     completedCount: 0,
     avgScore: "0%",
     masteredCount: 0,
-    opportunitiesCount: 10,
+    opportunitiesCount: 0,
     recentAssessmentScore: 0,
   });
   const [topicStrengths, setTopicStrengths] = useState<any[]>([]);
@@ -46,7 +49,7 @@ export default function StudentDashboard() {
               completedCount: sessionsCount,
               avgScore: `${Math.round(res.accuracy)}%`,
               masteredCount: mastered,
-              opportunitiesCount: Math.max(0, 10 - mastered),
+              opportunitiesCount: Math.max(0, topicsMap.size - mastered),
               recentAssessmentScore: Math.round(res.accuracy),
             });
 
@@ -60,87 +63,131 @@ export default function StudentDashboard() {
           }
         }).catch((err) => {
           console.error("Failed to load student analytics from API", err);
-          loadMockDashboard();
+          loadMockDashboard(topicsMap.size);
         });
       };
 
-      api.get<any[]>("/api/v1/topics").then((topicsList) => {
-        const topicsMap = new Map((topicsList || []).map(t => [t.id, t.name]));
+      api.get<any[]>("/api/v1/topics").then((resTopics) => {
+        const topicsList = Array.isArray(resTopics) ? resTopics : [];
+        const topicsMap = new Map(topicsList.map(t => [t.id, t.name]));
+        const count = topicsList.length;
+        setTopicsCount(count);
 
-        if (user && user.id) {
-          const completedKey = `completed_sessions_${user.id}`;
-          const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
-          if (sessionIds.length > 0) {
-            // Load recent test info
-            api.get<any>(`/api/v1/learning/sessions/${sessionIds[0]}`).then((sess) => {
-              if (sess) {
-                const topicName = topicsMap.get(sess.topic_id) || "Adaptive Assessment";
-                const dateStr = new Date(sess.completed_at || sess.created_at).toLocaleDateString("en-US", {
+        api.get<any>("/api/v1/students/me").then((student) => {
+          if (student && student.id) {
+            if (user) {
+              user.student_id = student.id;
+              sessionStorage.setItem("tp_user", JSON.stringify(user));
+            }
+
+            api.get<any[]>("/api/v1/learning/sessions").then((resSess) => {
+              const sessionsList = Array.isArray(resSess) ? resSess : [];
+              const completedSessions = sessionsList
+                .filter(s => s.status === "completed")
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+              // Calculate streak count
+              let streak = 0;
+              if (completedSessions.length > 0) {
+                const dates = Array.from(new Set(
+                  completedSessions.map(s => new Date(s.ended_at || s.created_at).toDateString())
+                )).map(d => new Date(d));
+                dates.sort((a, b) => b.getTime() - a.getTime());
+
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                const mostRecent = dates[0];
+                mostRecent.setHours(0,0,0,0);
+
+                if (mostRecent.getTime() >= yesterday.getTime()) {
+                  streak = 1;
+                  let currentCompare = mostRecent;
+                  for (let i = 1; i < dates.length; i++) {
+                    const d = dates[i];
+                    d.setHours(0,0,0,0);
+                    const diffDays = Math.round((currentCompare.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) {
+                      streak++;
+                      currentCompare = d;
+                    } else if (diffDays > 1) {
+                      break;
+                    }
+                  }
+                }
+              }
+              sessionStorage.setItem("tp_streak", String(streak));
+              window.dispatchEvent(new Event("storage"));
+
+              if (completedSessions.length > 0) {
+                const latestSess = completedSessions[0];
+                const topicName = topicsMap.get(latestSess.topic_id) || "Adaptive Assessment";
+                const dateStr = new Date(latestSess.ended_at || latestSess.created_at).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
                   year: "numeric"
                 });
+
                 setRecentTest({
                   name: topicName,
                   date: dateStr,
-                  questions: sess.total_questions_attempted || 15
+                  questions: latestSess.total_questions_attempted || 15
                 });
 
-                // Load student profile & analytics
-                if (sess.student_id) {
-                  user.student_id = sess.student_id;
-                  sessionStorage.setItem("tp_user", JSON.stringify(user));
-                  fetchAnalytics(sess.student_id, topicsMap);
-                } else {
-                  loadMockDashboard();
-                }
+                fetchAnalytics(student.id, topicsMap);
+
+                // Load performance trends list (last 5 sessions)
+                Promise.all(completedSessions.slice(0, 5).map(async (sess) => {
+                  try {
+                    const sAnalytics = await api.get<any>(`/api/v1/analytics/session/${sess.id}`);
+                    return {
+                      assessment: topicsMap.get(sess.topic_id) || "Test",
+                      score: Math.round(sAnalytics.accuracy)
+                    };
+                  } catch {
+                    return null;
+                  }
+                })).then((chartDataList) => {
+                  setPerformanceData(chartDataList.filter(Boolean) as any[]);
+                });
+
               } else {
-                loadMockDashboard();
+                loadMockDashboard(count);
               }
             }).catch((err) => {
-              console.error("Failed to fetch session details", err);
-              loadMockDashboard();
-            });
-
-            // Load performance trends list
-            Promise.all(sessionIds.slice(0, 5).map(async (sessId) => {
-              try {
-                const sDetail = await api.get<any>(`/api/v1/learning/sessions/${sessId}`);
-                const sAnalytics = await api.get<any>(`/api/v1/analytics/session/${sessId}`);
-                return {
-                  assessment: topicsMap.get(sDetail.topic_id) || "Test",
-                  score: Math.round(sAnalytics.accuracy)
-                };
-              } catch {
-                return null;
-              }
-            })).then((chartDataList) => {
-              setPerformanceData(chartDataList.filter(Boolean) as any[]);
+              console.error("Failed to fetch learning sessions from API", err);
+              loadMockDashboard(count);
             });
 
           } else {
-            loadMockDashboard();
+            loadMockDashboard(count);
           }
-        } else {
-          loadMockDashboard();
-        }
+        }).catch((err) => {
+          console.error("Failed to fetch current student profile", err);
+          loadMockDashboard(count);
+        });
+
       }).catch((err) => {
         console.error("Failed to load topics", err);
-        loadMockDashboard();
+        loadMockDashboard(0);
       });
 
-      function loadMockDashboard() {
+      function loadMockDashboard(tCount: number) {
         setHasAssessments(false);
         setStats({
           completedCount: 0,
           avgScore: "0%",
           masteredCount: 0,
-          opportunitiesCount: 10,
+          opportunitiesCount: tCount,
           recentAssessmentScore: 0,
         });
         setTopicStrengths([]);
         setPerformanceData([]);
         setRecentTest(null);
+        sessionStorage.setItem("tp_streak", "0");
+        window.dispatchEvent(new Event("storage"));
       }
     }
   }, []);
@@ -210,7 +257,9 @@ export default function StudentDashboard() {
                   <div style={{ fontSize: "3rem", fontWeight: 900, color: "var(--primary)", letterSpacing: "-0.04em", lineHeight: 1 }}>
                     {stats.recentAssessmentScore}%
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>Good Performance</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                    {stats.recentAssessmentScore >= 85 ? "Excellent Performance" : stats.recentAssessmentScore >= 60 ? "Good Performance" : "Needs Improvement"}
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Overall Progress</div>

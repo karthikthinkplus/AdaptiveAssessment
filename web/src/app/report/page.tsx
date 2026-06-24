@@ -21,46 +21,63 @@ export default function ReportsListPage() {
       if (user) {
         setUserName(user.name || "Student");
         setUserAvatar(user.avatar || "S");
-        
-        const completedKey = `completed_sessions_${user.id}`;
-        const sessionIds = JSON.parse(localStorage.getItem(completedKey) || "[]") as string[];
-        
-        if (sessionIds.length > 0) {
-          Promise.all(sessionIds.map(async (sessId) => {
-            try {
-              const [analytics, details] = await Promise.all([
-                api.get<any>(`/api/v1/analytics/session/${sessId}`),
-                api.get<any>(`/api/v1/learning/sessions/${sessId}`)
-              ]);
-              const dateStr = details?.created_at ? new Date(details.created_at).toLocaleDateString() : new Date().toLocaleDateString();
-              const score = Math.round(analytics.accuracy);
-              const computedMastery = score >= 90 ? "Mastered" : score >= 31 ? "Developing" : "Gap";
-              return {
-                id: sessId,
-                name: "Math Adaptive Test",
-                subject: "Mathematics",
-                date: dateStr,
-                score,
-                mastery: computedMastery,
-                status: details?.status || "Completed"
-              };
-            } catch (err) {
-              console.error("Failed to load details for session", sessId, err);
-              return null;
-            }
-          })).then((results) => {
-            const validReports = results.filter(Boolean);
-            setReportsList(validReports);
-            setLoading(false);
-          }).catch(() => {
-            setLoading(false);
-          });
-        } else {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
       }
+
+      api.get<any[]>("/api/v1/topics").then((topicsList) => {
+        const topicsMap = new Map((topicsList || []).map(t => [t.id, t.name]));
+
+        api.get<any>("/api/v1/students/me").then((student) => {
+          if (student && student.id) {
+            api.get<any[]>("/api/v1/learning/sessions").then((sessionsList) => {
+              const completedSessions = (Array.isArray(sessionsList) ? sessionsList : [])
+                .filter(s => s.status === "completed")
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+              if (completedSessions.length > 0) {
+                Promise.all(completedSessions.map(async (sess) => {
+                  try {
+                    const analytics = await api.get<any>(`/api/v1/analytics/session/${sess.id}`);
+                    const dateStr = sess.created_at ? new Date(sess.created_at).toLocaleDateString() : new Date().toLocaleDateString();
+                    const score = Math.round(analytics.accuracy);
+                    const computedMastery = score >= 90 ? "Mastered" : score >= 31 ? "Developing" : "Gap";
+                    return {
+                      id: sess.id,
+                      name: topicsMap.get(sess.topic_id) || "Math Adaptive Test",
+                      subject: "Mathematics",
+                      date: dateStr,
+                      score,
+                      mastery: computedMastery,
+                      status: sess.status || "Completed"
+                    };
+                  } catch (err) {
+                    console.error("Failed to load details for session", sess.id, err);
+                    return null;
+                  }
+                })).then((results) => {
+                  const validReports = results.filter(Boolean);
+                  setReportsList(validReports);
+                  setLoading(false);
+                }).catch(() => {
+                  setLoading(false);
+                });
+              } else {
+                setLoading(false);
+              }
+            }).catch((err) => {
+              console.error("Failed to load learning sessions", err);
+              setLoading(false);
+            });
+          } else {
+            setLoading(false);
+          }
+        }).catch((err) => {
+          console.error("Failed to fetch student profile", err);
+          setLoading(false);
+        });
+      }).catch((err) => {
+        console.error("Failed to fetch topics", err);
+        setLoading(false);
+      });
     }
   }, []);
 

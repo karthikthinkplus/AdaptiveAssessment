@@ -22,7 +22,7 @@ export default function TeacherAssessmentsPage() {
           name: topic.name,
           subject: "Mathematics",
           grade,
-          questions: 15,
+          questions: topic.question_count ?? 0,
           date: new Date(topic.created_at).toLocaleDateString(),
           status: topic.is_active ? "active" : "completed",
         };

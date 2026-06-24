@@ -36,3 +36,8 @@ NAV_ACTION_STAY = "stay"
 NAV_ACTION_ADVANCE = "advance"
 NAV_ACTION_BACKTRACK = "backtrack"
 NAV_ACTION_REVIEW = "review"
+
+# IRT-based session stopping rules
+IRT_THETA_UPPER_THRESHOLD = 1.50   # student has mastered the topic ceiling
+IRT_THETA_LOWER_THRESHOLD = -1.50  # student is below the floor of this topic
+SESSION_MAX_QUESTIONS = 30         # hard cap on questions per session

@@ -3,6 +3,7 @@ import AppShell from "@/components/layout/AppShell";
 import { Search, Plus, Play } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 type AssessmentTab = "all" | "active" | "completed";
@@ -20,6 +21,8 @@ export default function AssessmentsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [assessments, setAssessments] = useState<any[]>([]);
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -33,16 +36,40 @@ export default function AssessmentsListPage() {
       }
     }
 
-    api.get<any[]>("/api/v1/topics").then((list) => {
-      const mapped = (list || []).map((topic: any) => {
+    Promise.all([
+      api.get<any[]>("/api/v1/topics"),
+      api.get<any[]>("/api/v1/learning/sessions").catch(() => [])
+    ]).then(([topicsList, sessionsList]) => {
+      const completedSessionsMap = new Map<string, any>();
+      (sessionsList || []).forEach((s: any) => {
+        if (s.status === "completed") {
+          const score = s.total_questions_attempted > 0 
+            ? Math.round((s.total_correct / s.total_questions_attempted) * 100) 
+            : 0;
+          
+          const existing = completedSessionsMap.get(s.topic_id);
+          if (!existing || score > existing.score) {
+            completedSessionsMap.set(s.topic_id, {
+              id: s.id,
+              score,
+              status: "completed"
+            });
+          }
+        }
+      });
+
+      const mapped = (topicsList || []).map((topic: any) => {
+        const completedSession = completedSessionsMap.get(topic.id);
+        const isCompleted = !!completedSession;
         return {
           id: topic.id,
           name: topic.name,
           subject: "Mathematics",
-          questions: 15,
-          duration: 30,
+          questions: topic.question_count ?? 0,
+          duration: Math.max(10, Math.ceil((topic.question_count ?? 0) * 1.5)),
           date: new Date(topic.created_at).toLocaleDateString(),
-          status: topic.is_active ? "active" : "completed",
+          status: isCompleted ? "completed" : "active",
+          score: completedSession ? completedSession.score : undefined
         };
       });
       setAssessments(mapped);
@@ -50,6 +77,39 @@ export default function AssessmentsListPage() {
       console.error("Failed to load assessments (topics) from API", err);
     });
   }, []);
+
+  const handleStartAssessment = async (topicId: string) => {
+    setStartingId(topicId);
+    try {
+      const response = await api.post<{
+        session: { id: string; student_id: string };
+        first_question: any;
+      }>("/api/v1/learning/sessions/start", { topic_id: topicId });
+
+      if (response.session && response.session.student_id) {
+        const tpUser = sessionStorage.getItem("tp_user");
+        if (tpUser) {
+          try {
+            const parsed = JSON.parse(tpUser);
+            parsed.student_id = response.session.student_id;
+            sessionStorage.setItem("tp_user", JSON.stringify(parsed));
+          } catch (e) {
+            console.error("Failed to update user session with student_id", e);
+          }
+        }
+      }
+
+      if (response.first_question) {
+        sessionStorage.setItem("tp_current_question", JSON.stringify(response.first_question));
+      }
+
+      router.push(`/assessment/${response.session.id}`);
+    } catch (err: any) {
+      console.error("Failed to start assessment session:", err);
+      alert(err.message || "Failed to start assessment session.");
+      setStartingId(null);
+    }
+  };
 
   const shown = assessments.filter(a => {
     const matchesTab = tab === "all" || a.status === tab;
@@ -112,18 +172,33 @@ export default function AssessmentsListPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <span className={`tp-badge ${a.status === "active" ? "tp-badge-success" : a.status === "upcoming" ? "tp-badge-warning" : "tp-badge-neutral"}`} style={{ fontSize: "0.8" }}>
+              <span className={`tp-badge ${a.status === "active" ? "tp-badge-success" : "tp-badge-neutral"}`} style={{ fontSize: "0.8", textTransform: "capitalize" }}>
                 {a.status}
               </span>
               {a.score !== undefined ? (
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 800, fontSize: "1.25rem", color: "var(--primary)" }}>{a.score}%</div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Score</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 800, fontSize: "1.25rem", color: "var(--primary)" }}>{a.score}%</div>
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Score</div>
+                  </div>
+                  <button 
+                    onClick={() => handleStartAssessment(a.id)} 
+                    className="tp-btn-ghost" 
+                    disabled={startingId === a.id}
+                    style={{ fontSize: "0.8125rem", padding: "0.4rem 0.875rem" }}
+                  >
+                    {startingId === a.id ? "..." : "Retake"}
+                  </button>
                 </div>
               ) : (
-                <Link href="/assessment/session-001" className="tp-btn-primary" style={{ fontSize: "0.875rem", padding: "0.5rem 1.125rem" }}>
-                  <Play size={14} /> Start
-                </Link>
+                <button 
+                  onClick={() => handleStartAssessment(a.id)} 
+                  className="tp-btn-primary" 
+                  disabled={startingId === a.id}
+                  style={{ fontSize: "0.875rem", padding: "0.5rem 1.125rem" }}
+                >
+                  <Play size={14} /> {startingId === a.id ? "Starting..." : "Start"}
+                </button>
               )}
             </div>
           </div>

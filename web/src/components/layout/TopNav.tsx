@@ -27,23 +27,16 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
       let customNotifications: any[] = [];
       if (saved) {
         try {
-          customNotifications = JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          customNotifications = (Array.isArray(parsed) ? parsed : []).filter((n: any) => {
+            return n && n.id && n.id !== "1" && n.id !== "2" && n.id !== "3" && !String(n.id).startsWith("n");
+          });
         } catch (err) {
           console.error("Failed to parse admin notifications", err);
         }
       }
 
       const filteredCustom = customNotifications.filter((n: any) => n.targets?.includes(targetRoleKey));
-      
-      const mockWithTargets = [
-        { id: "n1", title: "New Assessment Assigned", message: "Math Adaptive Test has been assigned to Class 10 - A", time: "2 min ago", type: "assignment", read: false, important: true, targets: ["students"] },
-        { id: "n2", title: "Report Generated", message: "Performance report for Math Adaptive Test is ready", time: "1 hour ago", type: "report", read: false, important: false, targets: ["students"] },
-        { id: "n3", title: "Question Approved", message: "Your question Q21001 has been approved", time: "3 hours ago", type: "approval", read: true, important: false, targets: ["teachers", "qbms"] },
-        { id: "n4", title: "System Update", message: "Scheduled maintenance on May 28, 2024 at 11:00 PM", time: "1 day ago", type: "system", read: true, important: true, targets: ["students", "teachers", "qbms", "admin"] },
-        { id: "n5", title: "New Student Enrolled", message: "5 new students have joined Class 9 - B", time: "2 days ago", type: "assignment", read: true, important: false, targets: ["teachers"] },
-      ];
-      
-      const filteredMock = mockWithTargets.filter((n: any) => n.targets?.includes(targetRoleKey));
 
       const formattedCustom = filteredCustom.map((n: any) => ({
         id: `custom-${n.id}`,
@@ -55,7 +48,7 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
         important: n.important
       }));
 
-      setNotificationsList([...formattedCustom, ...filteredMock]);
+      setNotificationsList(formattedCustom);
     }
   }, [role, showNotifications]);
 
@@ -80,7 +73,20 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
   };
 
   const showStreak = title?.toLowerCase().includes("dashboard");
-  const streakCount = role === "student" ? 12 : role === "teacher" ? 8 : role === "qbm" ? 6 : 15;
+  const [streakCount, setStreakCount] = useState(0);
+
+  useEffect(() => {
+    const updateStreak = () => {
+      if (typeof window !== "undefined") {
+        const saved = sessionStorage.getItem("tp_streak");
+        setStreakCount(saved ? parseInt(saved, 10) : 0);
+      }
+    };
+    updateStreak();
+    window.addEventListener("storage", updateStreak);
+    return () => window.removeEventListener("storage", updateStreak);
+  }, []);
+
   const unreadCount = notificationsList.filter(n => !n.read).length;
 
   const isImageAvatar = userAvatar.startsWith("/avatars/");

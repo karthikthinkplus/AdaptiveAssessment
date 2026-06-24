@@ -12,7 +12,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("")
 def list_users(
-    _: object = Depends(require_roles(["admin"])),
+    _: object = Depends(require_roles(["admin", "teacher"])),
     db: Session = Depends(get_db),
 ):
     users = UserService(db).list_users()
