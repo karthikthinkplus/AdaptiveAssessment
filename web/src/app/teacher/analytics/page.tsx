@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import SkillPieChart from "@/components/charts/SkillPieChart";
 import SimpleBarChart from "@/components/charts/SimpleBarChart";
@@ -63,6 +64,7 @@ export default function TeacherAnalyticsPage() {
   ];
 
   return (
+    <RouteGuard allowedRoles={["teacher"]}>
     <AppShell title="Performance Analytics">
       <div className="animate-fade-in-up" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         
@@ -157,5 +159,6 @@ export default function TeacherAnalyticsPage() {
 
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

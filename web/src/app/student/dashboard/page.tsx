@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
@@ -26,6 +27,9 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("current_role", "student");
+      const token = sessionStorage.getItem("tp_token");
+      if (!token) return;
+
       const tpUser = sessionStorage.getItem("tp_user");
       const user = tpUser ? JSON.parse(tpUser) : null;
 
@@ -193,6 +197,7 @@ export default function StudentDashboard() {
   }, []);
 
   return (
+    <RouteGuard allowedRoles={["student"]}>
     <AppShell role="student" userName={userName} userAvatar={userAvatar} title="Student Dashboard">
       {/* ── Header Area ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
@@ -336,5 +341,6 @@ export default function StudentDashboard() {
         </div>
       )}
     </AppShell>
+    </RouteGuard>
   );
 }

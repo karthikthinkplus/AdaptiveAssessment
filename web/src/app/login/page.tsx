@@ -73,8 +73,7 @@ function LoginForm() {
 
   return (
     <>
-    <PublicHeader />
-    <main style={{ minHeight: "calc(100vh - 76px)", display: "grid", placeItems: "center", padding: "2rem", fontFamily: "\"Aeonik\", \"Inter\", \"Segoe UI\", sans-serif", position: "relative", overflow: "hidden" }}>
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "2rem", fontFamily: "\"Aeonik\", \"Inter\", \"Segoe UI\", sans-serif", position: "relative", overflow: "hidden" }}>
 
       <div style={{
         width: "100%",

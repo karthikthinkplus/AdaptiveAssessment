@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Terminal } from "lucide-react";
 import { useState } from "react";
@@ -7,6 +8,7 @@ export default function AdminAuditPage() {
   const [logs, setLogs] = useState<any[]>([]);
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell title="System Audit Logs">
 
 
@@ -47,5 +49,6 @@ export default function AdminAuditPage() {
         </table>
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Search, Building, Plus, MapPin, X, Save, Trash2, Power } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -147,6 +148,7 @@ export default function AdminInstitutionsPage() {
   };
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Institution Management">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
@@ -346,5 +348,6 @@ export default function AdminInstitutionsPage() {
         </div>
       )}
     </AppShell>
+    </RouteGuard>
   );
 }

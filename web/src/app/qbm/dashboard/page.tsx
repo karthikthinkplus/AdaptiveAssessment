@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { BookOpen, AlertCircle, CheckCircle, XCircle, Tag, Plus, Check, X } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -70,6 +71,7 @@ export default function QBMDashboard() {
   const topicsMap = new Map((topics || []).map(t => [t.id, t.name]));
 
   return (
+    <RouteGuard allowedRoles={["qbm","content_manager"]}>
     <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="QBM Dashboard">
       {/* ── Action Buttons ────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", justifyContent: "flex-end" }}>
@@ -150,5 +152,6 @@ export default function QBMDashboard() {
         )}
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

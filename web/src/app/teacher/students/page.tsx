@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import { useState, useEffect } from "react";
 import AppShell from "@/components/layout/AppShell";
 import { Search, Eye, Users, X } from "lucide-react";
@@ -53,6 +54,7 @@ export default function TeacherStudentsPage() {
   });
 
   return (
+    <RouteGuard allowedRoles={["teacher"]}>
     <AppShell title="Student Directory">
       <div className="animate-fade-in-up">
         
@@ -180,5 +182,6 @@ export default function TeacherStudentsPage() {
 
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Search, Trash, Edit, Plus, BookOpen } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -235,6 +236,7 @@ export default function QBMQuestionsPage() {
   });
 
   return (
+    <RouteGuard allowedRoles={["qbm","content_manager"]}>
     <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Question Bank Browser">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
@@ -437,5 +439,6 @@ export default function QBMQuestionsPage() {
         </div>
       )}
     </AppShell>
+    </RouteGuard>
   );
 }

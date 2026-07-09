@@ -104,9 +104,8 @@ export default function RegisterPage() {
 
   return (
     <>
-    <PublicHeader />
     <div style={{
-      minHeight: "calc(100vh - 76px)",
+      minHeight: "100vh",
       background: "transparent",
       fontFamily: "'Aeonik', 'Inter', 'Segoe UI', sans-serif",
       display: "flex",

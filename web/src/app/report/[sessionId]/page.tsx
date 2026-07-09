@@ -5,7 +5,6 @@ import { DIAGNOSTIC_REPORT, type SkillMastery } from "@/lib/mockData";
 import AnswerOutcomePieChart from "@/components/charts/AnswerOutcomePieChart";
 import SimpleBarChart from "@/components/charts/SimpleBarChart";
 import Link from "next/link";
-import PublicHeader from "@/components/layout/PublicHeader";
 import { Download, Share2, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -47,7 +46,6 @@ export default function DiagnosticReport() {
   const [averageTimePerQuestion, setAverageTimePerQuestion] = useState(72);
   const [abilityTheta, setAbilityTheta] = useState<number>(r.abilityTheta);
   const thetaValue = abilityTheta.toFixed(2);
-  const betaValue = (overallScore / 100).toFixed(2);
   const [dashboardHref, setDashboardHref] = useState("/student/dashboard");
   const [topicPerformance, setTopicPerformance] = useState([
     { topic: "Algebra", score: 62 },
@@ -305,151 +303,283 @@ export default function DiagnosticReport() {
   }, [sessionId]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--surface)", fontFamily: "Inter, sans-serif" }}>
-      <PublicHeader />
+    <div style={{ minHeight: "100vh", background: "#d4f0ee", fontFamily: "Inter, sans-serif", paddingBottom: "3rem" }}>
+      {/* Custom Floating Header Bar */}
+      <div
+        style={{
+          position: "sticky",
+          top: "1rem",
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          padding: "0 4%",
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "1.5rem"
+        }}
+      >
+        <header
+          style={{
+            width: "100%",
+            maxWidth: "1200px",
+            height: "56px",
+            background: "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            borderRadius: "999px",
+            padding: "0 1.5rem 0 2rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+            border: "1px solid rgba(0,0,0,0.04)"
+          }}
+        >
+          {/* Logo */}
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              textDecoration: "none",
+            }}
+          >
+            <img src="/logo.png" alt="thinkplus" style={{ height: "30px", width: "auto", display: "block" }} />
+          </Link>
 
-      <div style={{ maxWidth: 960, margin: "1.25rem auto 0", padding: "0 1.5rem", display: "flex", justifyContent: "flex-end", gap: "0.75rem", flexWrap: "wrap" }}>
-        <Link href={dashboardHref} className="tp-btn-ghost" style={{ fontSize: "0.875rem", padding: "0.5rem 1rem", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
-          <LayoutDashboard size={15} /> Go to Dashboard
-        </Link>
-        <button className="tp-btn-ghost" onClick={() => triggerToast("Share link copied to clipboard!")}><Share2 size={15} /> Share</button>
-        <button className="tp-btn-ghost" onClick={() => triggerToast("Diagnostic PDF report downloaded successfully!")}><Download size={15} /> Export PDF</button>
-        <Link href="/assessment/start" className="tp-btn-primary" style={{ fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
-          Take Another Test
-        </Link>
+          {/* Action buttons in header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <Link
+              href={dashboardHref}
+              className="tp-btn-ghost"
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                padding: "0.45rem 1rem",
+                textDecoration: "none",
+                borderRadius: "999px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                border: "1.5px solid #E5E7EB",
+                background: "#fff",
+                color: "#374151"
+              }}
+            >
+              <LayoutDashboard size={13} /> Go to Dashboard
+            </Link>
+            <button
+              onClick={() => triggerToast("Share link copied to clipboard!")}
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                padding: "0.45rem 1rem",
+                borderRadius: "999px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                border: "1.5px solid #E5E7EB",
+                background: "#fff",
+                color: "#374151",
+                cursor: "pointer"
+              }}
+            >
+              <Share2 size={13} /> Share
+            </button>
+            <button
+              onClick={() => triggerToast("Diagnostic PDF report downloaded successfully!")}
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                padding: "0.45rem 1rem",
+                borderRadius: "999px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                border: "1.5px solid #E5E7EB",
+                background: "#fff",
+                color: "#374151",
+                cursor: "pointer"
+              }}
+            >
+              <Download size={13} /> Export PDF
+            </button>
+            <Link
+              href="/assessment/start"
+              style={{
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                padding: "0.45rem 1.2rem",
+                borderRadius: "999px",
+                textDecoration: "none",
+                background: "#F25AA7",
+                color: "#fff",
+                boxShadow: "0 4px 14px rgba(242,90,167,0.25)"
+              }}
+            >
+              Take Another Test
+            </Link>
+          </div>
+        </header>
       </div>
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "1.5rem" }}>
 
-        {/* ── Header Card ───────────────────────────────────────────── */}
+        {/* ── Main Unified Report Card ───────────────────────────────── */}
         <div className="animate-fade-in-up" style={{
-          background: "linear-gradient(135deg, #1FA6A6 0%, #37C7B7 100%)",
-          borderRadius: 16, padding: "2rem", marginBottom: "1.25rem",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          background: "#ffffff",
+          borderRadius: 20,
+          marginBottom: "2rem",
+          border: "1.5px solid #111827",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
+          overflow: "hidden"
         }}>
-          <div>
-            <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.75)", marginBottom: "0.375rem" }}>Diagnostic Report — {r.completedAt}</div>
-            <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", marginBottom: "0.375rem" }}>
-              {studentName}
-            </h1>
-            <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.8)" }}>{studentGrade}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.72)", marginBottom: "0.5rem" }}>Ability Metrics</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", alignItems: "flex-end" }}>
-              <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em" }}>
-                Skill: {thetaValue}
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em" }}>
-                Knowledge: {betaValue}
-              </div>
-            </div>
-            <div style={{ marginTop: "0.85rem", display: "inline-flex", alignItems: "center", gap: "0.45rem", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 999, background: "rgba(255,255,255,0.14)", padding: "0.35rem 0.75rem" }}>
-              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "rgba(255,255,255,0.78)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Avg Time / Question</span>
-              <span style={{ fontSize: "0.86rem", fontWeight: 900, color: "#fff" }}>{formatAverageTime(averageTimePerQuestion)}</span>
-            </div>
-            <div style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.75)", marginTop: "0.25rem" }}>{gradeEquivalent}</div>
-          </div>
-        </div>
-
-        {/* ── Row 1: Pie Chart + Root Cause ────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: "1.25rem", marginBottom: "1.25rem" }}>
-
-          {/* Pie Chart */}
-          <div className="tp-card animate-fade-in-up stagger-1">
-            <div style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "0.25rem" }}>Answer Outcome Breakdown</div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>Correct, wrong, and guessed answers in this test</div>
-            <AnswerOutcomePieChart
-              correct={answerOutcomes.correct}
-              wrong={answerOutcomes.wrong}
-              guesses={answerOutcomes.guesses}
-              height={200}
-            />
-          </div>
-
-          {/* Topic Wise Analysis */}
-          <div className="tp-card animate-fade-in-up stagger-2" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.25rem" }}>Topic Wise Analysis</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Performance percentage across tested topics</div>
-            </div>
-            <SimpleBarChart
-              data={topicPerformance}
-              xKey="topic"
-              bars={[{ key: "score", color: "var(--primary)", name: "Performance" }]}
-              height={250}
-            />
-          </div>
-
-        </div>
-
-        {/* ── Skill Mastery Table ───────────────────────────────────── */}
-        <div className="tp-card animate-fade-in-up stagger-2" style={{ marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-            <div style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Skill Mastery Map</div>
-            <div style={{ display: "flex", gap: "0.75rem", fontSize: "0.75rem" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--success)", fontWeight: 600 }}>● Mastered ≥90%</span>
-              <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--warning)", fontWeight: 600 }}>● Developing 31-89%</span>
-              <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--danger)", fontWeight: 600 }}>● Gap ≤30%</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-            {masteryData.map((s: SkillMastery, i: number) => {
-              const currentLabel = getMasteryLabel(s.mastery);
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <div style={{ width: 180, flexShrink: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--text-primary)" }}>{s.skill}</div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{s.topic}</div>
+          
+          <div style={{ padding: "2.5rem" }}>
+            
+            {/* Section 1: Header/Profile Details */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", paddingBottom: "2rem", borderBottom: "1px solid #E5E7EB", marginBottom: "2rem" }}>
+              <div>
+                <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem" }}>Diagnostic Report — {r.completedAt}</div>
+                <h1 style={{ fontSize: "2.25rem", fontWeight: 900, color: "#111827", letterSpacing: "-0.03em", marginBottom: "0.15rem" }}>
+                  {studentName}
+                </h1>
+                <div style={{ fontSize: "0.95rem", color: "#4B5563", fontWeight: 600 }}>{studentGrade}</div>
+                
+                <div style={{ marginTop: "1.1rem", display: "flex", gap: "0.85rem", alignItems: "center" }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", border: "1px solid #E5E7EB", borderRadius: 999, background: "#F9FAFB", padding: "0.3rem 0.65rem" }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>Avg Time / Question</span>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 900, color: "#111827" }}>{formatAverageTime(averageTimePerQuestion)}</span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="mastery-bar-track">
-                      <div className="mastery-bar-fill" style={{ width: `${s.mastery * 100}%`, background: masteryColor(s.mastery) }} />
-                    </div>
-                  </div>
-                  <div style={{ width: 80, textAlign: "right", flexShrink: 0 }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 700, color: masteryColor(s.mastery) }}>
-                      {Math.round(s.mastery * 100)}%
-                    </span>
-                  </div>
-                  <span className={`tp-badge ${currentLabel === "Mastered" ? "tp-badge-success" : currentLabel === "Developing" ? "tp-badge-warning" : "tp-badge-danger"}`} style={{ width: 90, justifyContent: "center" }}>
-                    {currentLabel}
-                  </span>
+                  <div style={{ fontSize: "0.78rem", color: "#6B7280", fontWeight: 600 }}>Recommendation: <strong style={{ color: "#F25AA7", fontWeight: 800 }}>{gradeEquivalent}</strong></div>
                 </div>
-              );
-            })}
+              </div>
+              
+              <div style={{ display: "flex", gap: "1rem" }}>
+                {/* Stat Box 1: Estimated Ability */}
+                <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "0.85rem 1.4rem", minWidth: "155px", textAlign: "center", border: "1px solid #E2E8F0" }}>
+                  <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>Estimated Ability</div>
+                  <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#0F172A", letterSpacing: "-0.02em" }}>
+                    {thetaValue}
+                  </div>
+                  <div style={{ fontSize: "0.6rem", color: "#94A3B8", fontWeight: 600, marginTop: "0.1rem" }}>IRT Theta Value</div>
+                </div>
+
+                {/* Stat Box 2: Academic Accuracy */}
+                <div style={{ background: "#FFF0F6", borderRadius: "14px", padding: "0.85rem 1.4rem", minWidth: "155px", textAlign: "center", border: "1px solid #FFD8E4" }}>
+                  <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#C2185B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>Overall Accuracy</div>
+                  <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#E91E63", letterSpacing: "-0.02em" }}>
+                    {overallScore}%
+                  </div>
+                  <div style={{ fontSize: "0.6rem", color: "#F06292", fontWeight: 600, marginTop: "0.1rem" }}>BKT Probability</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Charts Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: "2.5rem", paddingBottom: "2rem", borderBottom: "1px solid #E5E7EB", marginBottom: "2rem" }}>
+              {/* Pie Chart */}
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#111827", marginBottom: "0.25rem" }}>Answer Outcome Breakdown</div>
+                <div style={{ fontSize: "0.78rem", color: "#6B7280", marginBottom: "1.5rem" }}>Correct, wrong, and guessed answers in this test</div>
+                <AnswerOutcomePieChart
+                  correct={answerOutcomes.correct}
+                  wrong={answerOutcomes.wrong}
+                  guesses={answerOutcomes.guesses}
+                  height={200}
+                />
+              </div>
+
+              {/* Topic Wise Analysis */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#111827", marginBottom: "0.25rem" }}>Topic Wise Analysis</div>
+                  <div style={{ fontSize: "0.78rem", color: "#6B7280", marginBottom: "0.5rem" }}>Performance percentage across tested topics</div>
+                </div>
+                <SimpleBarChart
+                  data={topicPerformance}
+                  xKey="topic"
+                  bars={[{ key: "score", color: "#F25AA7", name: "Performance" }]}
+                  height={200}
+                />
+              </div>
+            </div>
+
+            {/* Section 3: Skill Mastery Map */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#111827" }}>Skill Mastery Map</div>
+                <div style={{ display: "flex", gap: "1rem", fontSize: "0.75rem" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "var(--success)", fontWeight: 700 }}>● Mastered ≥90%</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "var(--warning)", fontWeight: 700 }}>● Developing 31-89%</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "var(--danger)", fontWeight: 700 }}>● Gap ≤30%</span>
+                </div>
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                {masteryData.map((s: SkillMastery, i: number) => {
+                  const currentLabel = getMasteryLabel(s.mastery);
+                  const barColor = masteryColor(s.mastery);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+                      <div style={{ width: 200, flexShrink: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "#111827" }}>{s.skill}</div>
+                        <div style={{ fontSize: "0.72rem", color: "#6B7280", marginTop: "0.1rem" }}>{s.topic}</div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ height: 10, background: "#F1F5F9", borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ width: `${s.mastery * 100}%`, height: "100%", background: barColor, borderRadius: 999, transition: "width 0.4s ease" }} />
+                        </div>
+                      </div>
+                      <div style={{ width: 60, textAlign: "right", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.875rem", fontWeight: 800, color: barColor }}>
+                          {Math.round(s.mastery * 100)}%
+                        </span>
+                      </div>
+                      <span className={`tp-badge ${currentLabel === "Mastered" ? "tp-badge-success" : currentLabel === "Developing" ? "tp-badge-warning" : "tp-badge-danger"}`} style={{ width: 100, justifyContent: "center", fontWeight: 700, borderRadius: "999px", padding: "0.25rem 0.65rem" }}>
+                        {currentLabel}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
 
         {/* ── Recent Reports ───────────────────────────────────────── */}
         {recentReports.length > 0 && (
-          <div className="animate-fade-in-up stagger-3">
-            <div style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Most Recent Reports</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+          <div className="animate-fade-in-up stagger-3" style={{ marginTop: "2.5rem" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "#111827", marginBottom: "1rem" }}>Most Recent Reports</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.25rem" }}>
               {recentReports.map((report, i) => (
-                <div key={i} className="tp-card" style={{ borderTop: "3px solid var(--primary)", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%" }}>
-                  <div>
+                <div key={i} className="tp-card" style={{ border: "1.5px solid #111827", borderRadius: 20, boxShadow: "0 10px 30px rgba(0,137,123,0.05)", background: "#fff", display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", padding: 0, overflow: "hidden" }}>
+                  <div style={{ height: "4px", background: "var(--primary)" }} />
+                  <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", flex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                      <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                         {report.subject || "Math"}
                       </div>
-                      <span className={`tp-badge ${report.score >= 80 ? "tp-badge-success" : "tp-badge-warning"}`}>
+                      <span className={`tp-badge ${report.score >= 80 ? "tp-badge-success" : "tp-badge-warning"}`} style={{ borderRadius: "999px", fontWeight: 700 }}>
                         {report.score}%
                       </span>
                     </div>
-                    <h4 style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+                    <h4 style={{ fontWeight: 800, fontSize: "0.875rem", color: "#111827", marginBottom: "0.25rem" }}>
                       {report.name}
                     </h4>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>
+                    <p style={{ fontSize: "0.75rem", color: "#6B7280", margin: 0 }}>
                       Completed: {report.date}
                     </p>
-                    <div style={{ marginTop: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", border: "1px solid var(--border)", borderRadius: 999, background: "#fff", padding: "0.3rem 0.65rem" }}>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-secondary)" }}>Knowledge:</span>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "var(--primary)" }}>{report.score}%</span>
+                    <div style={{ marginTop: "auto", paddingTop: "0.75rem" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", border: "1px solid #E5E7EB", borderRadius: 999, background: "#F9FAFB", padding: "0.25rem 0.6rem" }}>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 800, color: "#6B7280" }}>Knowledge:</span>
+                        <span style={{ fontSize: "0.72rem", fontWeight: 900, color: "var(--primary)" }}>{report.score}%</span>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ marginTop: "1rem" }}>
-                    <Link href={`/report/${report.sessionId}`} className="tp-btn-ghost" style={{ display: "flex", width: "100%", justifyContent: "center", fontSize: "0.75rem", padding: "0.4rem", textDecoration: "none" }}>
+                  <div style={{ padding: "0.75rem 1.25rem 1.25rem" }}>
+                    <Link href={`/report/${report.sessionId}`} className="tp-btn-ghost" style={{ display: "flex", width: "100%", justifyContent: "center", fontSize: "0.78rem", fontWeight: 700, padding: "0.45rem", textDecoration: "none", borderRadius: "999px", border: "1.5px solid #E5E7EB" }}>
                       View Detailed Report
                     </Link>
                   </div>

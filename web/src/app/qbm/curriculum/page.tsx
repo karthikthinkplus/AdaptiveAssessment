@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 
 import AppShell from "@/components/layout/AppShell";
 import {
@@ -297,6 +298,7 @@ export default function QBMCurriculumPage() {
   ];
 
   return (
+    <RouteGuard allowedRoles={["qbm","content_manager"]}>
     <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Curriculum Map">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <div>
@@ -526,5 +528,6 @@ export default function QBMCurriculumPage() {
         </div>
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

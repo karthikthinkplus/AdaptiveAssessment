@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Search, ClipboardList, Play } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -36,6 +37,7 @@ export default function AdminAssessmentsPage() {
   const totalCount = assessments.length;
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell title="Platform Assessments">
       <div className="animate-fade-in-up">
 
@@ -126,5 +128,6 @@ export default function AdminAssessmentsPage() {
         </div>
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

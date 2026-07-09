@@ -1,5 +1,11 @@
+"use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import ProfileClient from "@/components/profile/ProfileClient";
 
 export default function StudentProfilePage() {
-  return <ProfileClient />;
+  return (
+    <RouteGuard allowedRoles={["student"]}>
+      <ProfileClient />
+    </RouteGuard>
+  );
 }

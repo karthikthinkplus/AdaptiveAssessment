@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, BarChart2, User,
   Bell, LogOut, FileText, Users,
-  BookOpen, Upload, Settings, Building2, ChevronRight, Network
+  BookOpen, Upload, Settings, Building2, ChevronRight, Network,
+  MessageSquare
 } from "lucide-react";
 
 type Role = "student" | "teacher" | "qbm" | "admin";
@@ -18,8 +19,10 @@ interface NavItem {
 const NAV_ITEMS: Record<Role, NavItem[]> = {
   student: [
     { label: "Dashboard",    href: "/student/dashboard",          icon: <LayoutDashboard size={18} /> },
-    { label: "Reports",      href: "/report",      icon: <FileText size={18} /> },
-    { label: "Profile",      href: "/profile",            icon: <User size={18} /> },
+    { label: "Practice",     href: "/student/practice",           icon: <BookOpen size={18} /> },
+    { label: "Reports",      href: "/report",                     icon: <FileText size={18} /> },
+    { label: "Forum",        href: "/student/forum",              icon: <MessageSquare size={18} /> },
+    { label: "Profile",      href: "/profile",                    icon: <User size={18} /> },
   ],
   teacher: [
     { label: "Dashboard",  href: "/teacher/dashboard",  icon: <LayoutDashboard size={18} /> },
@@ -42,6 +45,8 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Institutions", href: "/admin/institutions",  icon: <Building2 size={18} /> },
     { label: "Users",        href: "/admin/users",         icon: <Users size={18} /> },
     { label: "Reports",      href: "/admin/reports",       icon: <FileText size={18} /> },
+    { label: "Forum",        href: "/admin/forum",         icon: <MessageSquare size={18} /> },
+    { label: "Practice",     href: "/admin/practice",      icon: <BookOpen size={18} /> },
     { label: "Notifications",href: "/admin/notifications", icon: <Bell size={18} /> },
     { label: "System Config", href: "/admin/settings",     icon: <Settings size={18} /> },
     { label: "Audit Logs",   href: "/admin/audit",         icon: <ClipboardList size={18} /> },

@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Search, UserPlus, Mail, X, Save } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -149,6 +150,7 @@ export default function AdminUsersPage() {
   };
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="User Management">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
@@ -304,5 +306,6 @@ export default function AdminUsersPage() {
         </div>
       )}
     </AppShell>
+    </RouteGuard>
   );
 }

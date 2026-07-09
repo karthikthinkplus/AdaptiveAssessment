@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Bell, ShieldAlert, BookOpen, UserCheck, Plus, Megaphone, Send, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -126,6 +127,7 @@ export default function AdminNotificationsPage() {
   };
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Platform Alerts & Notifications">
       <div className="animate-fade-in-up" style={{ maxWidth: "700px", margin: "0 auto" }}>
         {/* ── Actions Row ────────────────────────────────────────────── */}
@@ -389,5 +391,6 @@ export default function AdminNotificationsPage() {
         </div>
       )}
     </AppShell>
+    </RouteGuard>
   );
 }

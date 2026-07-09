@@ -96,9 +96,8 @@ export default function TeacherRegisterPage() {
 
   return (
     <>
-    <PublicHeader />
     <div style={{
-      minHeight: "calc(100vh - 76px)",
+      minHeight: "100vh",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",

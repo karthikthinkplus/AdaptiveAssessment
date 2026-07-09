@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { PLATFORM_SETTINGS } from "@/lib/mockData";
 import { Save, Settings } from "lucide-react";
@@ -15,6 +16,7 @@ export default function AdminSettingsPage() {
   };
 
   return (
+    <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="System Settings">
       <div style={{ maxWidth: "800px", margin: "0 auto" }}>
 
@@ -68,5 +70,6 @@ export default function AdminSettingsPage() {
         </form>
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

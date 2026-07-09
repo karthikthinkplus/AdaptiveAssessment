@@ -72,7 +72,7 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
     );
   };
 
-  const showStreak = title?.toLowerCase().includes("dashboard");
+  const showStreak = role === "student" && title?.toLowerCase().includes("dashboard");
   const [streakCount, setStreakCount] = useState(0);
 
   useEffect(() => {

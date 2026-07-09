@@ -1,4 +1,5 @@
 "use client";
+import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Upload, FileDown, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -108,6 +109,7 @@ export default function QBMUploadPage() {
   };
 
   return (
+    <RouteGuard allowedRoles={["qbm","content_manager"]}>
     <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Bulk Upload Questions">
       {/* ── Actions Row ────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
@@ -189,5 +191,6 @@ export default function QBMUploadPage() {
         </div>
       </div>
     </AppShell>
+    </RouteGuard>
   );
 }

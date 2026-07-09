@@ -41,6 +41,8 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("current_role", "teacher");
+      const token = sessionStorage.getItem("tp_token");
+      if (!token) return;
 
       api.get<any[]>("/api/v1/users").then((list) => {
         const studentList = (list || []).filter(u => inferRole(u.email, u.institution_name) === "Student");
