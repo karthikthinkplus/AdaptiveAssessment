@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { ChevronRight, ChevronDown, BookOpen, Layers, CheckSquare, Square, Target, HelpCircle, Check, Loader2, Award } from "lucide-react";
+import { ChevronRight, ChevronDown, BookOpen, Layers, CheckSquare, Square, Target, HelpCircle, Check, Loader2, Award, Lock } from "lucide-react";
 
 interface PracticeSelectorProps {
   role: "student" | "admin";
@@ -51,10 +51,13 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [sessionScore, setSessionScore] = useState<number | null>(null);
+  const [hasCheckedAnswer, setHasCheckedAnswer] = useState<boolean>(false);
+  const [isAnswerCorrect, setIsAnswerCorrect] = useState<boolean | null>(null);
 
   // Student Explanations States
   const [showExplanationArea, setShowExplanationArea] = useState(false);
   const [explanations, setExplanations] = useState<Record<number, string>>({});
+  const [completedSubtopics, setCompletedSubtopics] = useState<string[]>([]);
 
   // Grouping topics into sections
   const getSectionForTopic = (topicName: string): "Quant" | "Math" => {
@@ -66,11 +69,38 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("tp_completed_practice_subtopics");
+      if (stored) {
+        try {
+          setCompletedSubtopics(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
     // Fetch all topics from DB
     api.get<any[]>("/api/v1/topics")
-      .then((res) => {
+      .then(async (res) => {
         const topicsList = res || [];
         setTopics(topicsList);
+
+        // Fetch subtopics for all topics in parallel
+        const subMap: Record<string, Subtopic[]> = {};
+        await Promise.all(
+          topicsList.map(async (t) => {
+            try {
+              const subs = await api.get<Subtopic[]>(`/api/v1/topics/${t.id}/subtopics`);
+              subMap[t.id] = subs || [];
+            } catch (e) {
+              console.error(e);
+              subMap[t.id] = [];
+            }
+          })
+        );
+        setSubtopicsMap(subMap);
+
         // Initialize topic select states
         const initialTopics: Record<string, boolean> = {};
         topicsList.forEach(t => {
@@ -85,34 +115,58 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
       });
   }, []);
 
+  // Sequential lock/unlock helpers
+  const getFlatSubtopics = () => {
+    const flat: { subtopicId: string; topicId: string }[] = [];
+    const quantTopics = topics.filter(t => getSectionForTopic(t.name) === "Quant");
+    const mathTopics = topics.filter(t => getSectionForTopic(t.name) === "Math");
+    const orderedTopics = [...quantTopics, ...mathTopics];
+    
+    orderedTopics.forEach(t => {
+      const subs = subtopicsMap[t.id] || [];
+      subs.forEach(s => {
+        flat.push({ subtopicId: s.id, topicId: t.id });
+      });
+    });
+    return flat;
+  };
+
+  const isSubtopicUnlocked = (subtopicId: string) => {
+    // If role is admin, everything is unlocked
+    if (role === "admin") return true;
+
+    const flat = getFlatSubtopics();
+    const idx = flat.findIndex(f => f.subtopicId === subtopicId);
+    if (idx <= 0) return true; // first subtopic is always unlocked
+    
+    // Unlocked if previous is completed
+    const prevSubId = flat[idx - 1].subtopicId;
+    return completedSubtopics.includes(prevSubId);
+  };
+
+  const isTopicUnlocked = (topicId: string) => {
+    // If role is admin, everything is unlocked
+    if (role === "admin") return true;
+
+    const quantTopics = topics.filter(t => getSectionForTopic(t.name) === "Quant");
+    const mathTopics = topics.filter(t => getSectionForTopic(t.name) === "Math");
+    const orderedTopics = [...quantTopics, ...mathTopics];
+    const idx = orderedTopics.findIndex(t => t.id === topicId);
+    if (idx <= 0) return true; // first topic is always unlocked
+    
+    // Unlocked if the previous topic's last subtopic is completed
+    const prevTopic = orderedTopics[idx - 1];
+    const prevTopicSubs = subtopicsMap[prevTopic.id] || [];
+    if (prevTopicSubs.length === 0) return true; // fallback if no subtopics
+    const lastSubId = prevTopicSubs[prevTopicSubs.length - 1].id;
+    return completedSubtopics.includes(lastSubId);
+  };
+
+
   // Fetch subtopics from DB when a topic is expanded
-  const toggleTopicExpand = async (topicId: string) => {
+  const toggleTopicExpand = (topicId: string) => {
     const isExpanded = !!expandedTopics[topicId];
     setExpandedTopics({ ...expandedTopics, [topicId]: !isExpanded });
-
-    if (!isExpanded && !subtopicsMap[topicId]) {
-      setLoadingSubtopics({ ...loadingSubtopics, [topicId]: true });
-      try {
-        const subList = await api.get<Subtopic[]>(`/api/v1/topics/${topicId}/subtopics`);
-        const list = subList || [];
-        setSubtopicsMap(prev => ({ ...prev, [topicId]: list }));
-
-        // If parent topic was already selected, select all newly loaded subtopics
-        if (selectedTopics[topicId]) {
-          setSelectedSubtopics(prev => {
-            const updated = { ...prev };
-            list.forEach(st => {
-              updated[st.id] = true;
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to load subtopics for topic ${topicId}`, err);
-      } finally {
-        setLoadingSubtopics(prev => ({ ...prev, [topicId]: false }));
-      }
-    }
   };
 
   // ── Checked Actions ────────────────────────────────────────────────────────
@@ -203,16 +257,19 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
     {
       question: "The average of 5 consecutive numbers is 20. What is the largest of these numbers?",
       options: ["A. 20", "B. 22", "C. 24", "D. 25"],
-      correct: "B"
+      correct: "B",
+      explanation: "Let the 5 consecutive numbers be:\n1. x - 2\n2. x - 1\n3. x\n4. x + 1\n5. x + 2\n\nThe sum of these numbers is:\n(x - 2) + (x - 1) + x + (x + 1) + (x + 2) = 5x\n\nThe average is:\nSum / Count = 5x / 5 = x\n\nGiven that the average is 20:\nx = 20\n\nThus, the consecutive numbers are:\n18, 19, 20, 21, 22\n\nThe largest of these numbers is 22.\nTherefore, the correct option is B (22)."
     },
     {
       question: "Find the average speed (in km/h) of a car that travels 150 km in 3 hours.",
-      correct: "50"
+      correct: "50",
+      explanation: "To calculate the average speed, use the formula:\nAverage Speed = Total Distance / Total Time\n\nGiven values:\n- Total Distance = 150 km\n- Total Time = 3 hours\n\nCalculation:\nAverage Speed = 150 km / 3 hours = 50 km/h.\n\nTherefore, the correct answer is 50."
     },
     {
       question: "In a class of 40 students, the average score is 70%. In another class of 60 students, the average score is 80%. What is the weighted average score of both classes?",
       options: ["A. 74%", "B. 75%", "C. 76%", "D. 77%"],
-      correct: "C"
+      correct: "C",
+      explanation: "Use the weighted average formula:\nWeighted Average = (Sum of all scores) / (Total number of students)\n\n1. Find the sum of scores for Class 1:\nSum1 = 40 students * 70% = 2800 student-percentage\n\n2. Find the sum of scores for Class 2:\nSum2 = 60 students * 80% = 4800 student-percentage\n\n3. Calculate the total sum of scores:\nTotal Sum = 2800 + 4800 = 7600\n\n4. Calculate the total number of students:\nTotal Students = 40 + 60 = 100\n\n5. Calculate the weighted average:\nWeighted Average = 7600 / 100 = 76%.\n\nTherefore, the correct option is C (76%)."
     }
   ];
 
@@ -227,14 +284,28 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
     setSessionScore(null);
     setShowExplanationArea(false);
     setExplanations({});
+    setHasCheckedAnswer(false);
+    setIsAnswerCorrect(null);
   };
+
 
   const handleAnswerSelect = (optionLabel: string) => {
     setUserAnswers({ ...userAnswers, [currentQuestionIndex]: optionLabel });
   };
 
+  const handleCheckAnswer = () => {
+    const q = samplePracticeQuestions[currentQuestionIndex];
+    const userAns = (userAnswers[currentQuestionIndex] || "").trim().toLowerCase();
+    const correctAns = q.correct.trim().toLowerCase();
+    const correct = userAns === correctAns;
+    setIsAnswerCorrect(correct);
+    setHasCheckedAnswer(true);
+  };
+
   const handleNextQuestion = () => {
     setShowExplanationArea(false);
+    setHasCheckedAnswer(false);
+    setIsAnswerCorrect(null);
     if (currentQuestionIndex < samplePracticeQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -248,14 +319,25 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
         }
       });
       setSessionScore(Math.round((correctCount / samplePracticeQuestions.length) * 100));
+
+      // Save subtopics to completed
+      const newlyCompleted = [...completedSubtopics];
+      Object.keys(selectedSubtopics).forEach(subId => {
+        if (selectedSubtopics[subId] && !newlyCompleted.includes(subId)) {
+          newlyCompleted.push(subId);
+        }
+      });
+      setCompletedSubtopics(newlyCompleted);
+      localStorage.setItem("tp_completed_practice_subtopics", JSON.stringify(newlyCompleted));
     }
   };
+
 
   const quantTopics = topics.filter(t => getSectionForTopic(t.name) === "Quant");
   const mathTopics = topics.filter(t => getSectionForTopic(t.name) === "Math");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: activeSession ? "1fr" : "minmax(0, 1.8fr) minmax(0, 1.2fr)", gap: "1.5rem" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }}>
       
       {/* ── Active Practice View ────────────────────────────────────────── */}
       {activeSession ? (
@@ -427,21 +509,52 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                   {samplePracticeQuestions[currentQuestionIndex].options.map((opt) => {
                     const label = opt.charAt(0);
                     const isSelected = userAnswers[currentQuestionIndex] === label;
+                    const correctLabel = samplePracticeQuestions[currentQuestionIndex].correct;
+                    
+                    let borderStyle = "1.5px solid var(--border)";
+                    let backgroundStyle = "#FFF";
+                    let colorStyle = "var(--text-primary)";
+                    let fontWeightStyle = 500;
+
+                    if (hasCheckedAnswer) {
+                      if (label === correctLabel) {
+                        borderStyle = "2.5px solid #22C55E";
+                        backgroundStyle = "#F0FDF4";
+                        colorStyle = "#15803D";
+                        fontWeightStyle = 700;
+                      } else if (isSelected && label !== correctLabel) {
+                        borderStyle = "2.5px solid #EF4444";
+                        backgroundStyle = "#FEF2F2";
+                        colorStyle = "#B91C1C";
+                        fontWeightStyle = 700;
+                      }
+                    } else if (isSelected) {
+                      borderStyle = "2.5px solid var(--primary)";
+                      backgroundStyle = "rgba(242, 90, 167, 0.04)";
+                      colorStyle = "var(--primary)";
+                      fontWeightStyle = 700;
+                    }
+
                     return (
                       <button
                         key={opt}
-                        onClick={() => handleAnswerSelect(label)}
+                        onClick={() => {
+                          if (!hasCheckedAnswer) {
+                            handleAnswerSelect(label);
+                          }
+                        }}
+                        disabled={hasCheckedAnswer}
                         style={{
                           textAlign: "left",
                           width: "100%",
                           padding: "1rem",
                           borderRadius: "10px",
-                          border: isSelected ? "2.5px solid var(--primary)" : "1.5px solid var(--border)",
-                          background: isSelected ? "rgba(242, 90, 167, 0.04)" : "#FFF",
-                          color: isSelected ? "var(--primary)" : "var(--text-primary)",
+                          border: borderStyle,
+                          background: backgroundStyle,
+                          color: colorStyle,
                           fontSize: "0.875rem",
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: "pointer",
+                          fontWeight: fontWeightStyle,
+                          cursor: hasCheckedAnswer ? "default" : "pointer",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
@@ -449,7 +562,23 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                         }}
                       >
                         <span>{opt}</span>
-                        {isSelected && <div style={{ width: 16, height: 16, borderRadius: "50%", background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF" }}><Check size={10} strokeWidth={3} /></div>}
+                        {isSelected && (
+                          <div style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: hasCheckedAnswer ? (label === correctLabel ? "#22C55E" : "#EF4444") : "var(--primary)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#FFF"
+                          }}>
+                            <Check size={10} strokeWidth={3} />
+                          </div>
+                        )}
+                        {hasCheckedAnswer && label === correctLabel && !isSelected && (
+                          <div style={{ color: "#22C55E", fontSize: "0.75rem", fontWeight: 700 }}>Correct Answer</div>
+                        )}
                       </button>
                     );
                   })}
@@ -458,42 +587,119 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                 <div style={{ marginBottom: "2.5rem", marginTop: "1.5rem" }}>
                   <input
                     type="text"
-                    placeholder="Type your numeric answer here..."
+                    disabled={hasCheckedAnswer}
+                    placeholder={hasCheckedAnswer ? "Answers locked" : "Type your numeric answer here..."}
                     value={userAnswers[currentQuestionIndex] || ""}
                     onChange={(e) => handleAnswerSelect(e.target.value)}
                     style={{
                       width: "100%",
                       border: "none",
-                      borderBottom: "2.5px solid var(--border)",
+                      borderBottom: hasCheckedAnswer 
+                        ? (isAnswerCorrect ? "2.5px solid #22C55E" : "2.5px solid #EF4444")
+                        : "2.5px solid var(--border)",
                       outline: "none",
                       fontSize: "1.125rem",
                       fontWeight: 700,
                       padding: "0.6rem 0",
-                      color: "var(--text-primary)",
+                      color: hasCheckedAnswer 
+                        ? (isAnswerCorrect ? "#15803D" : "#B91C1C")
+                        : "var(--text-primary)",
                       background: "transparent",
                       transition: "border-color 0.2s"
                     }}
-                    onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
-                    onBlur={(e) => e.target.style.borderColor = "var(--border)"}
+                    onFocus={(e) => {
+                      if (!hasCheckedAnswer) {
+                        e.target.style.borderColor = "var(--primary)";
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!hasCheckedAnswer) {
+                        e.target.style.borderColor = "var(--border)";
+                      }
+                    }}
                   />
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.4rem" }}>Type your answer above to fill the blank line</div>
+                  {hasCheckedAnswer ? (
+                    <div style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      marginTop: "0.5rem",
+                      color: isAnswerCorrect ? "#15803D" : "#B91C1C"
+                    }}>
+                      {isAnswerCorrect 
+                        ? "✓ Correct Answer: 50" 
+                        : `✗ Incorrect. Your answer: "${userAnswers[currentQuestionIndex]}". Correct answer: "50"`
+                      }
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.4rem" }}>
+                      Type your answer above to fill the blank line
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Success / Error Explanation Message Box */}
+              {hasCheckedAnswer && (
+                <div style={{
+                  background: isAnswerCorrect ? "#F0FDF4" : "#FEF2F2",
+                  border: isAnswerCorrect ? "1px solid rgba(34, 197, 94, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)",
+                  borderLeft: isAnswerCorrect ? "4px solid #22C55E" : "4px solid #EF4444",
+                  borderRadius: "12px",
+                  padding: "1.25rem",
+                  marginBottom: "1.5rem"
+                }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    color: isAnswerCorrect ? "#15803D" : "#B91C1C",
+                    fontWeight: 800,
+                    fontSize: "0.9rem",
+                    marginBottom: "0.5rem"
+                  }}>
+                    <HelpCircle size={16} />
+                    <span>{isAnswerCorrect ? "Correct! Well done." : "Incorrect Answer — Explanation of How to Solve:"}</span>
+                  </div>
+                  <div style={{
+                    fontSize: "0.85rem",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-line",
+                    fontWeight: 500
+                  }}>
+                    {samplePracticeQuestions[currentQuestionIndex].explanation || "No explanation available."}
+                  </div>
                 </div>
               )}
 
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  disabled={!userAnswers[currentQuestionIndex]}
-                  onClick={handleNextQuestion}
-                  className="tp-btn-primary"
-                  style={{
-                    padding: "0.625rem 2rem",
-                    opacity: userAnswers[currentQuestionIndex] ? 1 : 0.5,
-                    cursor: userAnswers[currentQuestionIndex] ? "pointer" : "not-allowed"
-                  }}
-                >
-                  {currentQuestionIndex === samplePracticeQuestions.length - 1 ? "Finish Session" : "Next Question"}
-                </button>
+                {!hasCheckedAnswer ? (
+                  <button
+                    disabled={!userAnswers[currentQuestionIndex]}
+                    onClick={handleCheckAnswer}
+                    className="tp-btn-primary"
+                    style={{
+                      padding: "0.625rem 2rem",
+                      opacity: userAnswers[currentQuestionIndex] ? 1 : 0.5,
+                      cursor: userAnswers[currentQuestionIndex] ? "pointer" : "not-allowed"
+                    }}
+                  >
+                    Check Answer
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleNextQuestion}
+                    className="tp-btn-primary"
+                    style={{
+                      padding: "0.625rem 2rem",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {currentQuestionIndex === samplePracticeQuestions.length - 1 ? "Finish Session" : "Next Question"}
+                  </button>
+                )}
               </div>
+
             </div>
           )}
         </div>
@@ -505,7 +711,7 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
               Select Topics for Practice
             </h2>
             <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "2rem", lineHeight: 1.4 }}>
-              Choose specific mathematical domains, topics, and subtopics to customize your learning. Checked sections automatically select all underlying concepts.
+              Choose specific mathematical domains, topics, and subtopics to customize your learning. Topics and subtopics unlock sequentially as you complete sessions.
             </p>
 
             {loadingTopics ? (
@@ -544,23 +750,39 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                     {quantTopics.map((topic, index) => {
                       const isExpanded = !!expandedTopics[topic.id];
                       const isSelected = !!selectedTopics[topic.id];
+                      const unlocked = isTopicUnlocked(topic.id);
                       return (
-                        <div key={topic.id} style={{ borderBottom: index === quantTopics.length - 1 ? "none" : "1px solid #F1F5F9" }}>
+                        <div key={topic.id} style={{ borderBottom: index === quantTopics.length - 1 ? "none" : "1px solid #F1F5F9", opacity: unlocked ? 1 : 0.6 }}>
                           {/* Topic Entry */}
                           <div style={{ display: "flex", alignItems: "center", justifyItems: "center", padding: "0.6rem 0.5rem", gap: "0.5rem" }}>
-                            <button
-                              onClick={() => toggleTopicExpand(topic.id)}
-                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--text-muted)", padding: 0 }}
+                            {unlocked ? (
+                              <>
+                                <button
+                                  onClick={() => toggleTopicExpand(topic.id)}
+                                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--text-muted)", padding: 0 }}
+                                >
+                                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                </button>
+                                <button
+                                  onClick={() => handleTopicSelect(topic.id, "Quant")}
+                                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
+                                >
+                                  {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                                </button>
+                              </>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", justifyItems: "center", gap: "0.5rem", color: "var(--text-muted)", paddingLeft: "0.25rem", paddingRight: "0.25rem" }}>
+                                <Lock size={14} />
+                              </div>
+                            )}
+                            <span 
+                              style={{ fontSize: "0.875rem", fontWeight: 700, color: unlocked ? "#1F2A44" : "var(--text-muted)", cursor: unlocked ? "pointer" : "default" }} 
+                              onClick={() => {
+                                if (unlocked) {
+                                  toggleTopicExpand(topic.id);
+                                }
+                              }}
                             >
-                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            </button>
-                            <button
-                              onClick={() => handleTopicSelect(topic.id, "Quant")}
-                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
-                            >
-                              {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                            </button>
-                            <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#1F2A44", cursor: "pointer" }} onClick={() => toggleTopicExpand(topic.id)}>
                               {topic.name}
                             </span>
                             <span style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", borderRadius: "10px", background: "#F1F5F9", color: "var(--text-secondary)", textTransform: "capitalize", marginLeft: "auto" }}>
@@ -569,7 +791,7 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                           </div>
 
                           {/* Subtopics List (Render when expanded) */}
-                          {isExpanded && (
+                          {isExpanded && unlocked && (
                             <div style={{ paddingLeft: "2rem", paddingBottom: "0.5rem", background: "#FAFBFD" }}>
                               {loadingSubtopics[topic.id] ? (
                                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "0.5rem 0", display: "flex", gap: "0.25rem" }}>
@@ -578,16 +800,23 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                               ) : (
                                 (subtopicsMap[topic.id] || []).map((sub) => {
                                   const isSubSelected = !!selectedSubtopics[sub.id];
+                                  const subUnlocked = isSubtopicUnlocked(sub.id);
                                   return (
-                                    <div key={sub.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0" }}>
-                                      <button
-                                        onClick={() => handleSubtopicSelect(sub.id, topic.id, "Quant")}
-                                        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
-                                      >
-                                        {isSubSelected ? <CheckSquare size={14} /> : <Square size={14} />}
-                                      </button>
+                                    <div key={sub.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0", opacity: subUnlocked ? 1 : 0.6 }}>
+                                      {subUnlocked ? (
+                                        <button
+                                          onClick={() => handleSubtopicSelect(sub.id, topic.id, "Quant")}
+                                          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
+                                        >
+                                          {isSubSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                        </button>
+                                      ) : (
+                                        <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)", width: 14, height: 14, flexShrink: 0, paddingLeft: "0.1rem" }}>
+                                          <Lock size={12} />
+                                        </div>
+                                      )}
                                       <div style={{ display: "flex", flexDirection: "column" }}>
-                                        <span style={{ fontSize: "0.825rem", color: "var(--text-primary)", fontWeight: isSubSelected ? 700 : 500 }}>
+                                        <span style={{ fontSize: "0.825rem", color: subUnlocked ? "var(--text-primary)" : "var(--text-muted)", fontWeight: isSubSelected ? 700 : 500 }}>
                                           {sub.name}
                                         </span>
                                         {sub.description && (
@@ -642,23 +871,39 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                     {mathTopics.map((topic, index) => {
                       const isExpanded = !!expandedTopics[topic.id];
                       const isSelected = !!selectedTopics[topic.id];
+                      const unlocked = isTopicUnlocked(topic.id);
                       return (
-                        <div key={topic.id} style={{ borderBottom: index === mathTopics.length - 1 ? "none" : "1px solid #F1F5F9" }}>
+                        <div key={topic.id} style={{ borderBottom: index === mathTopics.length - 1 ? "none" : "1px solid #F1F5F9", opacity: unlocked ? 1 : 0.6 }}>
                           {/* Topic Entry */}
                           <div style={{ display: "flex", alignItems: "center", justifyItems: "center", padding: "0.6rem 0.5rem", gap: "0.5rem" }}>
-                            <button
-                              onClick={() => toggleTopicExpand(topic.id)}
-                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--text-muted)", padding: 0 }}
+                            {unlocked ? (
+                              <>
+                                <button
+                                  onClick={() => toggleTopicExpand(topic.id)}
+                                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--text-muted)", padding: 0 }}
+                                >
+                                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                </button>
+                                <button
+                                  onClick={() => handleTopicSelect(topic.id, "Math")}
+                                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
+                                >
+                                  {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                                </button>
+                              </>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", justifyItems: "center", gap: "0.5rem", color: "var(--text-muted)", paddingLeft: "0.25rem", paddingRight: "0.25rem" }}>
+                                <Lock size={14} />
+                              </div>
+                            )}
+                            <span 
+                              style={{ fontSize: "0.875rem", fontWeight: 700, color: unlocked ? "#1F2A44" : "var(--text-muted)", cursor: unlocked ? "pointer" : "default" }} 
+                              onClick={() => {
+                                if (unlocked) {
+                                  toggleTopicExpand(topic.id);
+                                }
+                              }}
                             >
-                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            </button>
-                            <button
-                              onClick={() => handleTopicSelect(topic.id, "Math")}
-                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
-                            >
-                              {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                            </button>
-                            <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#1F2A44", cursor: "pointer" }} onClick={() => toggleTopicExpand(topic.id)}>
                               {topic.name}
                             </span>
                             <span style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", borderRadius: "10px", background: "#F1F5F9", color: "var(--text-secondary)", textTransform: "capitalize", marginLeft: "auto" }}>
@@ -667,7 +912,7 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                           </div>
 
                           {/* Subtopics List (Render when expanded) */}
-                          {isExpanded && (
+                          {isExpanded && unlocked && (
                             <div style={{ paddingLeft: "2rem", paddingBottom: "0.5rem", background: "#FAFBFD" }}>
                               {loadingSubtopics[topic.id] ? (
                                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "0.5rem 0", display: "flex", gap: "0.25rem" }}>
@@ -676,16 +921,23 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
                               ) : (
                                 (subtopicsMap[topic.id] || []).map((sub) => {
                                   const isSubSelected = !!selectedSubtopics[sub.id];
+                                  const subUnlocked = isSubtopicUnlocked(sub.id);
                                   return (
-                                    <div key={sub.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0" }}>
-                                      <button
-                                        onClick={() => handleSubtopicSelect(sub.id, topic.id, "Math")}
-                                        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
-                                      >
-                                        {isSubSelected ? <CheckSquare size={14} /> : <Square size={14} />}
-                                      </button>
+                                    <div key={sub.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0", opacity: subUnlocked ? 1 : 0.6 }}>
+                                      {subUnlocked ? (
+                                        <button
+                                          onClick={() => handleSubtopicSelect(sub.id, topic.id, "Math")}
+                                          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--primary)", padding: 0 }}
+                                        >
+                                          {isSubSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                        </button>
+                                      ) : (
+                                        <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)", width: 14, height: 14, flexShrink: 0, paddingLeft: "0.1rem" }}>
+                                          <Lock size={12} />
+                                        </div>
+                                      )}
                                       <div style={{ display: "flex", flexDirection: "column" }}>
-                                        <span style={{ fontSize: "0.825rem", color: "var(--text-primary)", fontWeight: isSubSelected ? 700 : 500 }}>
+                                        <span style={{ fontSize: "0.825rem", color: subUnlocked ? "var(--text-primary)" : "var(--text-muted)", fontWeight: isSubSelected ? 700 : 500 }}>
                                           {sub.name}
                                         </span>
                                         {sub.description && (
@@ -714,46 +966,33 @@ export default function PracticeSelector({ role }: PracticeSelectorProps) {
 
               </div>
             )}
-          </div>
 
-          {/* ── Selection Summary Panel ────────────────────────────────────── */}
-          <div className="tp-card animate-fade-in-up stagger-1" style={{ height: "fit-content", background: "#FAFBFD", border: "1.5px solid var(--border)" }}>
-            <h3 style={{ fontSize: "0.95rem", fontWeight: 800, color: "#1F2A44", display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "1rem" }}>
-              <Target size={18} color="var(--primary)" /> Practice Summary
-            </h3>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", marginBottom: "1.5rem", borderBottom: "1px solid var(--border)", paddingBottom: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                <span>Selected Topics</span>
-                <span style={{ fontWeight: 700, color: "#1F2A44" }}>{totalSelectedTopics}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                <span>Selected Subtopics</span>
-                <span style={{ fontWeight: 700, color: "var(--primary)" }}>{totalSelectedSubtopics}</span>
-              </div>
-            </div>
-
-            {role === "student" ? (
-              <button
-                disabled={totalSelectedSubtopics === 0}
-                onClick={handleStartPractice}
-                className="tp-btn-primary"
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 700,
-                  opacity: totalSelectedSubtopics === 0 ? 0.55 : 1,
-                  cursor: totalSelectedSubtopics === 0 ? "not-allowed" : "pointer"
-                }}
-              >
-                Start Practice ({totalSelectedSubtopics})
-              </button>
-            ) : (
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", background: "#FFF", border: "1px dashed var(--border)", padding: "0.75rem", borderRadius: "8px", textAlign: "center" }}>
-                Logged in as Admin. Review selection behavior. Practice button disabled for Admin views.
+            {/* Start Practice Action Button at the bottom of the Topic Selector Card */}
+            {!loadingTopics && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "2rem", borderTop: "1px solid var(--border)", paddingTop: "1.5rem" }}>
+                {role === "student" ? (
+                  <button
+                    disabled={totalSelectedSubtopics === 0}
+                    onClick={handleStartPractice}
+                    className="tp-btn-primary"
+                    style={{
+                      padding: "0.75rem 2.5rem",
+                      fontSize: "0.875rem",
+                      fontWeight: 700,
+                      opacity: totalSelectedSubtopics === 0 ? 0.55 : 1,
+                      cursor: totalSelectedSubtopics === 0 ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    Start Practice ({totalSelectedSubtopics} Selected)
+                  </button>
+                ) : (
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", background: "#FFF", border: "1px dashed var(--border)", padding: "0.75rem", borderRadius: "8px", textAlign: "center" }}>
+                    Logged in as Admin. Review selection behavior. Practice button disabled for Admin views.
+                  </div>
+                )}
               </div>
             )}
+
           </div>
         </>
       )}

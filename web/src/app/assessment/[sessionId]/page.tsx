@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import PublicHeader from "@/components/layout/PublicHeader";
+
 import { SAMPLE_QUESTIONS } from "@/lib/mockData";
 import { ChevronRight, ChevronLeft, AlertTriangle, Clock } from "lucide-react";
 import { api } from "@/lib/api";
@@ -222,29 +222,36 @@ export default function AssessmentPlayer() {
 
   return (
     <div style={{ minHeight: "100vh", background: "transparent", fontFamily: "'Aeonik', 'Inter', sans-serif", display: "flex", flexDirection: "column", position: "relative" }}>
-      <PublicHeader />
 
-      <div style={{ display: "flex", justifyContent: "center", padding: "1.25rem 1.5rem 0" }}>
+
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "1rem", maxWidth: 860, margin: "0 auto", width: "100%", padding: "3rem 1.5rem" }}>
+
+        {/* Timer — straight pill pinned to the left of the card */}
         <div style={{
           display: "flex",
           alignItems: "center",
           gap: "0.5rem",
           background: "#FFF6CB",
           border: "1px solid #F4D85C",
-          borderRadius: 999,
-          padding: "0.45rem 0.9rem",
-          fontSize: "0.875rem",
-          fontWeight: 700,
+          borderRadius: "12px",
+          padding: "0.5rem 0.85rem",
           color: "#8A6800",
-          fontFamily: "monospace",
+          flexShrink: 0,
+          marginTop: "0.5rem",
+          boxShadow: "0 2px 8px rgba(228,170,16,0.15)"
         }}>
-          <Clock size={15} color="#E0AA10" />
-          <span>{formatTime(timeElapsed)}</span>
+          <Clock size={16} color="#E0AA10" />
+          <span style={{
+            fontSize: "0.875rem",
+            fontWeight: 800,
+            fontFamily: "monospace",
+            letterSpacing: "0.02em"
+          }}>{formatTime(timeElapsed)}</span>
         </div>
-      </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 760, margin: "0 auto", width: "100%", padding: "3rem 1.5rem" }}>
-        <div className="tp-card animate-scale-in" key={isMock ? currentIndex : question.id} style={{ padding: "2rem" }}>
+
+        {/* Question Card */}
+        <div className="tp-card animate-scale-in" key={isMock ? currentIndex : question.id} style={{ padding: "2rem", flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginBottom: "1.5rem" }}>
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>Topic:</span>
             <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 700 }}>{question.skillBreadcrumb.topic}</span>

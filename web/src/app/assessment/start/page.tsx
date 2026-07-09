@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import PublicHeader from "@/components/layout/PublicHeader";
+import AppShell from "@/components/layout/AppShell";
+
 import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -146,54 +147,28 @@ export default function AssessmentStart() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "transparent", fontFamily: "Inter, sans-serif", display: "flex", flexDirection: "column" }}>
-      <PublicHeader />
+    <AppShell role="student" title="Start Assessment">
       <style dangerouslySetInnerHTML={{ __html: `
         .assessment-start-layout {
           width: 100%;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(320px, 450px) minmax(0, 1fr);
+          display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0;
         }
 
         .assessment-card-form {
-          grid-column: 2;
-          position: relative;
-          z-index: 2;
           width: 100%;
-        }
-
-        .assessment-guide {
-          grid-column: 3;
-          position: relative;
-          z-index: 3;
-          justify-self: start;
-          margin-left: -4rem;
-          margin-top: 5.25rem;
-          pointer-events: none;
+          max-width: 480px;
         }
 
         @media (max-width: 860px) {
-          .assessment-start-layout {
-            grid-template-columns: 1fr;
-            max-width: 520px;
-            justify-items: center;
-          }
-
           .assessment-card-form {
-            grid-column: 1;
             max-width: 100%;
-          }
-
-          .assessment-guide {
-            display: none;
           }
         }
       `}} />
 
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem 1.5rem" }}>
         <div className="assessment-start-layout">
           <form onSubmit={handleStart} className="assessment-card-form animate-fade-in-up">
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--shadow-md)", padding: "2rem 1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -221,7 +196,7 @@ export default function AssessmentStart() {
               {/* Rules and Guidelines */}
               <div style={{ background: "var(--surface)", borderRadius: 12, padding: "1.25rem", border: "1px solid var(--border)" }}>
                 <h3 style={{ fontSize: "0.875rem", fontWeight: 700, marginBottom: "0.75rem", color: "var(--text-primary)" }}>
-                  Assessment Rules & Guidelines
+                  Assessment Rules &amp; Guidelines
                 </h3>
                 <ul style={{ paddingLeft: "1.15rem", margin: 0, fontSize: "0.8125rem", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "0.5rem", lineHeight: 1.4 }}>
                   <li><strong>Adaptive Engine:</strong> The questions adapt to your performance. Answering correctly leads to harder questions; incorrect answers lead to easier ones.</li>
@@ -242,23 +217,8 @@ export default function AssessmentStart() {
               </button>
             </div>
           </form>
-
-          <div className="assessment-guide animate-fade-in-up">
-            <img
-              src="/tech-raccoon.png"
-              alt="ThinkPlus guide pointing toward the assessment card"
-              style={{
-                width: "min(43vw, 470px)",
-                minWidth: 390,
-                height: "auto",
-                display: "block",
-                borderRadius: 24,
-                filter: "drop-shadow(0 18px 30px rgba(15, 23, 42, 0.16))",
-              }}
-            />
-          </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }
