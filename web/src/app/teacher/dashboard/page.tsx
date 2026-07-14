@@ -117,8 +117,6 @@ export default function TeacherDashboard() {
   const chartAvg = Math.round(chartData.reduce((acc, curr) => acc + curr.score, 0) / chartData.length);
   const avgPerformance = `${chartAvg}%`;
   
-  // Stats multipliers based on selectedClass/Subject
-  let classMultiplier = 1.0;
   const totalStudents = students.length;
   const masteredTopics = 0;
   const needingAttention = 0;
@@ -526,7 +524,7 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {/* ── Dashboard Cards ───────────────────────────────────────── */}
+            {/* -- Dashboard Cards ----------------------------------------- */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
               {[
                 { label: "Total Students", value: totalStudents, icon: <Users size={18} color="var(--primary)" />, trend: "+2 this week" },
@@ -576,7 +574,7 @@ export default function TeacherDashboard() {
           </div>
         </>
       ) : (
-        /* ── Empty State ───────────────────────────────────────────── */
+        /* -- Empty State --------------------------------------------- */
         <div className="tp-card animate-fade-in-up" style={{ maxWidth: 500, margin: "4rem auto", padding: "4rem 2rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <AlertCircle size={30} color="var(--primary)" />

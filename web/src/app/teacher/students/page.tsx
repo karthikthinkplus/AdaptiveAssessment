@@ -24,7 +24,7 @@ const getSkillsForStudent = (score: number) => {
 
 export default function TeacherStudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState("All Batches");
 
@@ -93,7 +93,7 @@ export default function TeacherStudentsPage() {
         </div>
 
         {filtered.length > 0 ? (
-          /* ── Table ───────────────────────────────────────────────── */
+          /* -- Table ------------------------------------------------- */
           <div className="tp-card" style={{ padding: 0 }}>
             <table className="tp-table">
               <thead>
@@ -164,7 +164,7 @@ export default function TeacherStudentsPage() {
             </table>
           </div>
         ) : (
-          /* ── Empty State ─────────────────────────────────────────── */
+          /* -- Empty State ------------------------------------------- */
           <div className="tp-card animate-fade-in-up" style={{ padding: "4rem 2rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Users size={30} color="var(--primary)" />

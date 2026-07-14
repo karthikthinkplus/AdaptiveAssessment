@@ -1,0 +1,12 @@
+# Pyrefly configuration for ThinkPlus AAT backend
+# Tells Pyrefly to treat the project root as a source root so that
+# `app.*` imports are resolved correctly without a virtual environment.
+
+# Type-check everything under the app package
+project_includes = ["app"]
+
+# Add the project root to the import search path so `import app.*` works
+search_path = ["."]
+
+# Use the system Python interpreter that runs this project
+python_interpreter = "C:/Users/harika kota/AppData/Local/Programs/Python/Python314/python.exe"

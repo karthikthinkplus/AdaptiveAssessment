@@ -36,7 +36,7 @@ def start_session(
     return success_response(
         "Learning session started successfully",
         {
-            "session": result["session"],
+            "session": LearningSessionRead.model_validate(result["session"]).model_dump(mode="json"),
             "first_question": result["first_question"].model_dump() if result["first_question"] else None,
         },
     )
@@ -57,7 +57,7 @@ def submit_answer(
         payload.submitted_answer,
         payload.response_time_seconds,
     )
-    result["session"] = result["session"]
+    result["session"] = LearningSessionRead.model_validate(result["session"]).model_dump(mode="json")
     if result["next_question"]:
         result["next_question"] = result["next_question"].model_dump()
     return success_response("Answer submitted successfully", result)
@@ -70,7 +70,10 @@ def get_session(
     db: Session = Depends(get_db),
 ):
     session = LearningSessionService(db).get_session(session_id)
-    return success_response("Learning session fetched successfully", session)
+    return success_response(
+        "Learning session fetched successfully",
+        LearningSessionRead.model_validate(session).model_dump(mode="json")
+    )
 
 
 @router.get("/sessions/{session_id}/current-question")
@@ -83,8 +86,8 @@ def get_current_question(
     return success_response(
         "Current question fetched successfully",
         {
-            "session": result["session"],
-            "question": result["question"],
+            "session": LearningSessionRead.model_validate(result["session"]).model_dump(mode="json"),
+            "question": result["question"].model_dump() if result["question"] else None,
         }
     )
 
@@ -97,7 +100,10 @@ def pause_session(
     db: Session = Depends(get_db),
 ):
     session = LearningSessionService(db).pause_session(session_id, current_user.id)
-    return success_response("Learning session paused successfully", session)
+    return success_response(
+        "Learning session paused successfully",
+        LearningSessionRead.model_validate(session).model_dump(mode="json")
+    )
 
 
 @router.post("/sessions/{session_id}/end")
@@ -107,4 +113,7 @@ def end_session(
     db: Session = Depends(get_db),
 ):
     session = LearningSessionService(db).end_session(session_id, current_user.id)
-    return success_response("Learning session ended successfully", session)
+    return success_response(
+        "Learning session ended successfully",
+        LearningSessionRead.model_validate(session).model_dump(mode="json")
+    )

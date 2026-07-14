@@ -173,7 +173,7 @@ export default function TeacherReportsPage() {
         </div>
       </div>
 
-      {/* ── Toast Notifications ────────────────────────────────── */}
+      {/* -- Toast Notifications ---------------------------------- */}
       {toastMessage && (
         <div style={{
           position: "fixed",

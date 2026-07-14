@@ -5,6 +5,7 @@ import { Search, UserPlus, Mail, X, Save } from "lucide-react";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { INSTITUTION_LIST } from "@/lib/mockData";
+import { deferEffect } from "@/lib/browserState";
 
 type UserRole = "Student" | "Teacher" | "QBM" | "Admin";
 type UserStatus = "Active" | "Inactive";
@@ -40,7 +41,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [draft, setDraft] = useState(emptyUserDraft);
@@ -67,7 +68,7 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    loadUsers();
+    return deferEffect(loadUsers);
   }, []);
 
   const filteredUsers = users.filter(user => {
@@ -152,7 +153,7 @@ export default function AdminUsersPage() {
   return (
     <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="User Management">
-      {/* ── Actions Row ────────────────────────────────────────────── */}
+      {/* -- Actions Row ---------------------------------------------- */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button onClick={openAddUser} className="tp-btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>
           <UserPlus size={16} /> Add New User

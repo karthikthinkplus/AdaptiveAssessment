@@ -14,7 +14,7 @@ export default function LandingPage() {
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap');
 
-        /* ── Cloud float animation ── */
+        /* -- Cloud float animation -- */
         @keyframes cloud-drift-l { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-18px)} }
         @keyframes cloud-drift-r { 0%,100%{transform:translateX(0)} 50%{transform:translateX(18px)} }
         @keyframes icon-bob      { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-14px) rotate(4deg)} }
@@ -31,7 +31,7 @@ export default function LandingPage() {
           flex-direction: column;
         }
 
-        /* ── Clouds ── */
+        /* -- Clouds -- */
         .cloud-wrap { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 
         .cloud {
@@ -95,7 +95,7 @@ export default function LandingPage() {
           filter: blur(18px);
         }
 
-        /* ── Hero text area ── */
+        /* -- Hero text area -- */
         .hero-center {
           position: relative;
           z-index: 2;
@@ -182,7 +182,7 @@ export default function LandingPage() {
         }
         .hero-btn-ghost:hover { background: rgba(255,255,255,0.28); transform: translateY(-2px); }
 
-        /* ── Floating decorative elements (adaptive theme) ── */
+        /* -- Floating decorative elements (adaptive theme) -- */
         .hero-floaters {
           position: absolute;
           inset: 0;
@@ -201,7 +201,7 @@ export default function LandingPage() {
         .floater-5 { left: 22%; top: 72%; animation: icon-bob   6s ease-in-out infinite 1.5s; font-size: 2.2rem; }
         .floater-6 { right: 22%; top: 70%; animation: icon-bob-r 8s ease-in-out infinite 3s; font-size: 2.2rem; }
 
-        /* ── Green ground strip at the bottom ── */
+        /* -- Green ground strip at the bottom -- */
         .hero-ground {
           position: relative;
           z-index: 2;
@@ -299,7 +299,7 @@ export default function LandingPage() {
         .mockup-dot { width: 9px; height: 9px; border-radius: 50%; }
         .mockup-label { font-size: 0.72rem; font-weight: 700; color: #9CA3AF; margin-left: 4px; }
 
-        /* ── Why section ── */
+        /* -- Why section -- */
         .why-section {
           text-align: center;
           padding: 5rem 2rem 6rem;
@@ -330,7 +330,7 @@ export default function LandingPage() {
       {/* PUBLIC HEADER */}
       <PublicHeader />
 
-      {/* ── SKY HERO ── */}
+      {/* -- SKY HERO -- */}
       <section className="hero-sky">
 
         {/* Clouds */}
@@ -363,7 +363,7 @@ export default function LandingPage() {
           </div>
           <div className="hero-cta-group">
             <Link href="/register" className="hero-btn-main">
-              Get Started Free <ArrowRight size={18} />
+              Register <ArrowRight size={18} />
             </Link>
             <Link href="/login" className="hero-btn-ghost">
               Log In
@@ -415,8 +415,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="feature-divider"><hr /></div>
-
         {/* SECTION 2: Topic Practice */}
         <div className="feature-section reverse">
           <div>
@@ -451,8 +449,6 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-
-        <div className="feature-divider"><hr /></div>
 
         {/* SECTION 3: Reports */}
         <div className="feature-section">
@@ -500,8 +496,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="feature-divider"><hr /></div>
-
         {/* SECTION 4: Forum */}
         <div className="feature-section reverse">
           <div>
@@ -541,7 +535,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* ── WHY THINKPLUS ── */}
+        {/* -- WHY THINKPLUS -- */}
         <div className="why-section">
           <span className="feat-tag" style={{ background: "rgba(255,152,0,0.12)", color: "#E65100", fontSize: "0.73rem" }}>Why ThinkPlus?</span>
           <h2 className="feat-title" style={{ marginTop: "0.7rem" }}>Designed for students, not spreadsheets</h2>
@@ -563,16 +557,6 @@ export default function LandingPage() {
                 <p>{card.desc}</p>
               </div>
             ))}
-          </div>
-
-          {/* Final CTA */}
-          <div style={{ marginTop: "3.5rem", display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/register" style={{ background: "#F25AA7", color: "#fff", borderRadius: 999, padding: "0.9rem 2.2rem", fontSize: "0.95rem", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.4rem", boxShadow: "0 8px 24px rgba(242,90,167,0.32)" }}>
-              Get Started Free →
-            </Link>
-            <Link href="/login" style={{ background: "#fff", color: "#00A396", borderRadius: 999, padding: "0.9rem 2.2rem", fontSize: "0.95rem", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.4rem", border: "2px solid #00A396" }}>
-              Log In
-            </Link>
           </div>
         </div>
 

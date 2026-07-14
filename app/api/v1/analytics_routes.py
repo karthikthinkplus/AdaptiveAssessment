@@ -11,6 +11,15 @@ from app.services.analytics_service import AnalyticsService
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
+@router.get("/admin/stats")
+def get_admin_stats(
+    _: object = Depends(require_roles(["admin"])),
+    db: Session = Depends(get_db),
+):
+    data = AnalyticsService(db).get_admin_dashboard_analytics()
+    return success_response("Admin analytics fetched successfully", data)
+
+
 @router.get("/student/{student_id}")
 def get_student_analytics(
     student_id: UUID,

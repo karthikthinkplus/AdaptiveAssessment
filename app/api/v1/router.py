@@ -4,6 +4,7 @@ from app.api.v1.adaptive_routes import router as adaptive_router
 from app.api.v1.analytics_routes import router as analytics_router
 from app.api.v1.auth_routes import router as auth_router
 from app.api.v1.avatar_routes import router as avatar_router
+from app.api.v1.doubt_routes import router as doubt_router
 from app.api.v1.learning_routes import router as learning_router
 from app.api.v1.question_routes import router as question_router
 from app.api.v1.student_routes import router as student_router
@@ -22,4 +23,5 @@ api_router.include_router(upload_router)
 api_router.include_router(learning_router)
 api_router.include_router(adaptive_router)
 api_router.include_router(analytics_router)
+api_router.include_router(doubt_router)
 

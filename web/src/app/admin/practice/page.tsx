@@ -5,6 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 import { useEffect, useState } from "react";
 import { BookOpen, Users, BarChart2, ChevronRight, Layers, TrendingUp, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { deferEffect, readSessionUser } from "@/lib/browserState";
 
 interface Topic {
   id: string;
@@ -20,8 +21,7 @@ interface Subtopic {
 }
 
 export default function AdminPracticePage() {
-  const [userName, setUserName] = useState("Admin");
-  const [userAvatar, setUserAvatar] = useState("AD");
+  const [user] = useState(() => readSessionUser({ name: "Admin", avatar: "AD", role: "admin" }));
   const [topics, setTopics] = useState<Topic[]>([]);
   const [subtopicsMap, setSubtopicsMap] = useState<Record<string, Subtopic[]>>({});
   const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({});
@@ -30,23 +30,14 @@ export default function AdminPracticePage() {
   const [activeTab, setActiveTab] = useState<"overview" | "curriculum">("overview");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "Admin");
-        setUserAvatar("AD");
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    api.get<any[]>("/api/v1/topics")
-      .then((res) => {
-        setTopics(res || []);
-        setLoadingTopics(false);
-      })
-      .catch(() => setLoadingTopics(false));
+    return deferEffect(() => {
+      api.get<any[]>("/api/v1/topics")
+        .then((res) => {
+          setTopics(res || []);
+          setLoadingTopics(false);
+        })
+        .catch(() => setLoadingTopics(false));
+    });
   }, []);
 
   const toggleTopicExpand = async (topicId: string) => {
@@ -77,7 +68,7 @@ export default function AdminPracticePage() {
 
   return (
     <RouteGuard allowedRoles={["admin"]}>
-    <AppShell role="admin" userName={userName} userAvatar={userAvatar} title="Practice Management">
+    <AppShell role="admin" userName={user.name} userAvatar="AD" title="Practice Management">
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
         {/* Page Header */}

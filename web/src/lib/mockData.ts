@@ -1,6 +1,6 @@
-// ─── Mock Data — Adaptive Assessment Tool ─────────────────────────────────────
+// --- Mock Data — Adaptive Assessment Tool -------------------------------------
 
-// ── Auth / Users ──────────────────────────────────────────────────────────────
+// -- Auth / Users --------------------------------------------------------------
 export type UserRole = "student" | "teacher" | "qbm" | "admin";
 
 export interface User {
@@ -26,7 +26,7 @@ export const MOCK_USERS: User[] = [
   { id: "u6", name: "Admin User", email: "admin@example.com", role: "admin", avatar: "AU", institution: "Platform", status: "active", joinedAt: "2023-09-01" },
 ];
 
-// ── Student Dashboard ─────────────────────────────────────────────────────────
+// -- Student Dashboard ---------------------------------------------------------
 export const STUDENT_STATS = {
   overallProgress: 72,
   masteredTopics: { value: 18, total: 52 },
@@ -72,7 +72,7 @@ export const RECENT_ASSESSMENT = {
   score: 82,
 };
 
-// ── Assessments List ──────────────────────────────────────────────────────────
+// -- Assessments List ----------------------------------------------------------
 export interface Assessment {
   id: string;
   name: string;
@@ -95,7 +95,7 @@ export const ASSESSMENTS: Assessment[] = [
   { id: "a6", name: "Number Theory Quiz", type: "adaptive", questions: 15, duration: 30, status: "completed", date: "Apr 28, 2024", score: 76 },
 ];
 
-// ── Assessment Player ─────────────────────────────────────────────────────────
+// -- Assessment Player ---------------------------------------------------------
 export interface Question {
   id: string;
   index: number;
@@ -147,7 +147,7 @@ export const SAMPLE_QUESTIONS: Question[] = [
   },
 ];
 
-// ── Diagnostic Report ─────────────────────────────────────────────────────────
+// -- Diagnostic Report ---------------------------------------------------------
 export interface SkillMastery {
   skill: string;
   topic: string;
@@ -240,7 +240,7 @@ export const DIAGNOSTIC_REPORT = {
 
 
 
-// ── Teacher Dashboard ─────────────────────────────────────────────────────────
+// -- Teacher Dashboard ---------------------------------------------------------
 export const TOPIC_PERFORMANCE_RADAR = [
   { dimension: "Statistics", score: 80 },
   { dimension: "Algebra", score: 72 },
@@ -258,7 +258,7 @@ export const STUDENT_LIST = [
   { id: "s6", name: "Divya Nair", score: 67, ability: 0.88, trend: "neutral" },
 ];
 
-// ── Question Bank ─────────────────────────────────────────────────────────────
+// -- Question Bank -------------------------------------------------------------
 export interface QuestionRecord {
   id: string;
   questionText: string;
@@ -281,7 +281,7 @@ export const QUESTION_BANK: QuestionRecord[] = [
   { id: "Q008", questionText: "Two trains start from the same point. What is their relative speed?", subject: "Math", topic: "Arithmetic", difficulty: "Very Hard", type: "Word Problem", status: "Active", grade: 9 },
 ];
 
-// ── Notifications ─────────────────────────────────────────────────────────────
+// -- Notifications -------------------------------------------------------------
 export interface Notification {
   id: string;
   title: string;
@@ -300,7 +300,7 @@ export const NOTIFICATIONS: Notification[] = [
   { id: "n5", title: "New Student Enrolled", message: "5 new students have joined Class 9 - B", time: "2 days ago", type: "assignment", read: true, important: false },
 ];
 
-// ── Settings ──────────────────────────────────────────────────────────────────
+// -- Settings ------------------------------------------------------------------
 export const PLATFORM_SETTINGS = {
   platformName: "ThinkPlus",
   supportEmail: "support@thinkplus.com",
@@ -313,7 +313,7 @@ export const PLATFORM_SETTINGS = {
   requireEmailVerification: true,
 };
 
-// ── Super Admin ───────────────────────────────────────────────────────────────
+// -- Super Admin ---------------------------------------------------------------
 export const ADMIN_STATS = {
   totalInstitutions: 48,
   institutionsTrend: "+3 this month",
@@ -367,7 +367,7 @@ export const ADMIN_STUDENT_PROGRESS = {
   ],
 };
 
-// ── QBM (Question Bank Manager) ───────────────────────────────────────────────
+// -- QBM (Question Bank Manager) -----------------------------------------------
 export const QBM_STATS = {
   totalQuestions: 2_480,
   pendingReview: 34,

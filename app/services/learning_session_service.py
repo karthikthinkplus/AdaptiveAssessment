@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -209,7 +209,7 @@ class LearningSessionService:
         if session.student_id != student.id:
             raise AppException("Session does not belong to the current student", "FORBIDDEN", 403)
         session.status = SESSION_STATUS_COMPLETED
-        session.ended_at = datetime.utcnow()
+        session.ended_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(session)
         return session
@@ -341,7 +341,7 @@ class LearningSessionService:
             next_question, reason, difficulty_gate, pool_size = None, stopping_reason, [], 0
             # Auto-complete the session — the test is done
             session.status = SESSION_STATUS_COMPLETED
-            session.ended_at = datetime.utcnow()
+            session.ended_at = datetime.now(timezone.utc)
         else:
             next_question, reason, difficulty_gate, pool_size = self._select_question(
                 session.topic_id, target_subtopic_id, session.id, trait.theta

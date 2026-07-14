@@ -3,11 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.config import settings
+from app.database.base import Base
+from app.database.session import engine
 from app.exceptions import register_exception_handlers, success_response
 from app.logging_config import configure_logging
+import app.models  # noqa: F401
 
 
 configure_logging()
+Base.metadata.create_all(bind=engine)
 app = FastAPI(title="ThinkPlus Adaptive Learning and Assessment Backend")
 register_exception_handlers(app)
 

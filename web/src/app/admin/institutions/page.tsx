@@ -150,7 +150,7 @@ export default function AdminInstitutionsPage() {
   return (
     <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Institution Management">
-      {/* ── Actions Row ────────────────────────────────────────────── */}
+      {/* -- Actions Row ---------------------------------------------- */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button onClick={openRegister} className="tp-btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>
           <Plus size={16} /> Register Institution

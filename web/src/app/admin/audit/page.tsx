@@ -5,7 +5,7 @@ import { Terminal } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminAuditPage() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs] = useState<any[]>([]);
 
   return (
     <RouteGuard allowedRoles={["admin"]}>

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import { api } from "@/lib/api";
 import { MOCK_AVATARS, AvatarItem } from "@/lib/avatarsData";
-import { Edit2, Camera, Key, School, ShieldAlert, Award, User, X, Search, Flame } from "lucide-react";
+import { Edit2, Camera, Key, School, ShieldAlert, User, X, Search, Flame } from "lucide-react";
 
 type Role = "student" | "teacher" | "qbm" | "admin";
 type ProfileSession = {
@@ -310,7 +310,7 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
 
   return (
     <AppShell role={activeRole} userName={name} userAvatar={getAvatarSource(activeAvatar)} title="Profile">
-      {/* ── Dynamic keyframe animation style ── */}
+      {/* -- Dynamic keyframe animation style -- */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes avatar-pulse {
           0% { box-shadow: 0 0 10px rgba(160, 137, 230, 0.4), 0 0 5px rgba(160, 137, 230, 0.2); }
@@ -514,7 +514,7 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
         </div>
       </div>
 
-      {/* ── Avatar Choice Modal Card ────────────────────────────────── */}
+      {/* -- Avatar Choice Modal Card ---------------------------------- */}
       {showAvatarModal && (
         <div style={{
           position: "fixed",
@@ -819,7 +819,7 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
         </div>
       )}
 
-      {/* ── Password Reset Modal ────────────────────────────────── */}
+      {/* -- Password Reset Modal ---------------------------------- */}
       {showPasswordModal && (
         <div style={{
           position: "fixed",
@@ -909,7 +909,7 @@ function ProfileContent({ initialProfile }: { initialProfile: ProfileSession }) 
         </div>
       )}
 
-      {/* ── Toast Notifications ────────────────────────────────── */}
+      {/* -- Toast Notifications ---------------------------------- */}
       {toastMessage && (
         <div style={{
           position: "fixed",

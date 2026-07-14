@@ -46,6 +46,7 @@ export default function AdminDashboard() {
       const uList = usersList || [];
       const qList = questionsList || [];
       const tList = topicsList || [];
+      setCompletedTestsCount(qList.length);
 
       // Filter distinct institutions
       const instNames = Array.from(new Set(uList.map(u => u.institution_name).filter(Boolean)));
@@ -131,7 +132,7 @@ export default function AdminDashboard() {
     <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Admin Dashboard">
 
-      {/* ── Admin Dashboard Stat Cards ───────────────────────────────── */}
+      {/* -- Admin Dashboard Stat Cards --------------------------------- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
         {[
           { label: "Total Institutions", value: stats.totalInstitutions, icon: <Building2 size={18} color="var(--primary)" /> },
@@ -154,7 +155,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* ── Practice Telemetry Dashboard Stats ─────────────────────────── */}
+      {/* -- Practice Telemetry Dashboard Stats --------------------------- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
         {[
           {
@@ -183,7 +184,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* ── Charts & Tables Row ────────────────────────────────────── */}
+      {/* -- Charts & Tables Row -------------------------------------- */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)", gap: "1.25rem", marginBottom: "1.25rem" }}>
         {/* Average Student Progress */}
         <div className="tp-card animate-fade-in-up stagger-1" style={{ minWidth: 0 }}>
@@ -261,7 +262,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ── Topic Average Accuracy rates ─────────────────────────────── */}
+      {/* -- Topic Average Accuracy rates ------------------------------- */}
       <div className="tp-card animate-fade-in-up stagger-3" style={{ marginBottom: "1.5rem" }}>
         <div style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "1rem" }}>Topic Average Student Accuracy Rates</div>
         <div style={{ overflowX: "auto" }}>

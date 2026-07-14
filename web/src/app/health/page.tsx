@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import PublicHeader from "@/components/layout/PublicHeader";
+import { deferEffect } from "@/lib/browserState";
 import { 
   HeartPulse, 
   Activity, 
@@ -10,8 +11,7 @@ import {
   RefreshCw, 
   Server, 
   HardDrive, 
-  Layers, 
-  Clock 
+  Layers
 } from "lucide-react";
 
 interface HealthData {
@@ -58,12 +58,18 @@ export default function HealthPage() {
   };
 
   useEffect(() => {
-    fetchHealth();
-    const interval = setInterval(() => {
+    let interval: ReturnType<typeof setInterval>;
+    const cancelStart = deferEffect(() => {
       fetchHealth();
-    }, 15000); // Poll every 15s
+      interval = setInterval(() => {
+        fetchHealth();
+      }, 15000); // Poll every 15s
+    });
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelStart();
+      clearInterval(interval);
+    };
   }, []);
 
   // Increment local uptime display every second

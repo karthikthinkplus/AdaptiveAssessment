@@ -2,25 +2,14 @@
 import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
 import { Upload, FileDown, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { readSessionUser } from "@/lib/browserState";
 
 export default function QBMUploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [success, setSuccess] = useState(false);
-  const [userName, setUserName] = useState("QBM Developer");
-  const [userAvatar, setUserAvatar] = useState("RK");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "QBM Developer");
-        setUserAvatar(user.avatar || "RK");
-      }
-    }
-  }, []);
+  const [user] = useState(() => readSessionUser({ name: "QBM Developer", avatar: "RK", role: "qbm" }));
 
   const handleDownloadTemplate = async () => {
     try {
@@ -110,8 +99,8 @@ export default function QBMUploadPage() {
 
   return (
     <RouteGuard allowedRoles={["qbm","content_manager"]}>
-    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Bulk Upload Questions">
-      {/* ── Actions Row ────────────────────────────────────────────── */}
+    <AppShell role="qbm" userName={user.name} userAvatar={user.avatar} title="Bulk Upload Questions">
+      {/* -- Actions Row ---------------------------------------------- */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button 
           onClick={handleDownloadTemplate}

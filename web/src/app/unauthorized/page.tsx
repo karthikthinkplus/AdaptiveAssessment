@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ShieldX, ArrowLeft, LogOut } from "lucide-react";
+import { readSessionUser } from "@/lib/browserState";
 
 const ROLE_DASHBOARD: Record<string, string> = {
   student: "/student/dashboard",
@@ -21,23 +22,9 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export default function UnauthorizedPage() {
-  const [role, setRole] = useState<string>("");
-  const [userName, setUserName] = useState<string>("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const raw = sessionStorage.getItem("tp_user");
-        const user = raw ? JSON.parse(raw) : null;
-        if (user) {
-          setRole((user.role || "").toLowerCase());
-          setUserName(user.name || "");
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  }, []);
+  const [user] = useState(() => readSessionUser({ name: "", avatar: "", role: "" }));
+  const role = user.role;
+  const userName = user.name;
 
   const dashboardHref = ROLE_DASHBOARD[role] || "/login";
   const roleLabel = ROLE_LABEL[role] || "User";

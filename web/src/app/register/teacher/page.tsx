@@ -2,7 +2,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PublicHeader from "@/components/layout/PublicHeader";
 import { Mail, Lock, User, ArrowRight, School, Eye, EyeOff, Phone } from "lucide-react";
 import { api } from "@/lib/api";
 

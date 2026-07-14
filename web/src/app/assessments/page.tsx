@@ -1,10 +1,10 @@
 "use client";
 import AppShell from "@/components/layout/AppShell";
 import { Search, Plus, Play } from "lucide-react";
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { deferEffect } from "@/lib/browserState";
 
 type AssessmentTab = "all" | "active" | "completed";
 type SessionUser = {
@@ -19,62 +19,63 @@ const ASSESSMENT_TABS: { id: AssessmentTab; label: string }[] = [
 export default function AssessmentsListPage() {
   const [tab, setTab] = useState<AssessmentTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const [currentUser] = useState<SessionUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    const session = sessionStorage.getItem("tp_user");
+    if (!session) return null;
+    try {
+      return JSON.parse(session) as SessionUser;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  });
   const [assessments, setAssessments] = useState<any[]>([]);
   const [startingId, setStartingId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const session = sessionStorage.getItem("tp_user");
-      if (session) {
-        try {
-          setCurrentUser(JSON.parse(session) as SessionUser);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    }
+    return deferEffect(() => {
+      Promise.all([
+        api.get<any[]>("/api/v1/topics"),
+        api.get<any[]>("/api/v1/learning/sessions").catch(() => [])
+      ]).then(([topicsList, sessionsList]) => {
+        const completedSessionsMap = new Map<string, any>();
+        (sessionsList || []).forEach((s: any) => {
+          if (s.status === "completed") {
+            const score = s.total_questions_attempted > 0
+              ? Math.round((s.total_correct / s.total_questions_attempted) * 100)
+              : 0;
 
-    Promise.all([
-      api.get<any[]>("/api/v1/topics"),
-      api.get<any[]>("/api/v1/learning/sessions").catch(() => [])
-    ]).then(([topicsList, sessionsList]) => {
-      const completedSessionsMap = new Map<string, any>();
-      (sessionsList || []).forEach((s: any) => {
-        if (s.status === "completed") {
-          const score = s.total_questions_attempted > 0 
-            ? Math.round((s.total_correct / s.total_questions_attempted) * 100) 
-            : 0;
-          
-          const existing = completedSessionsMap.get(s.topic_id);
-          if (!existing || score > existing.score) {
-            completedSessionsMap.set(s.topic_id, {
-              id: s.id,
-              score,
-              status: "completed"
-            });
+            const existing = completedSessionsMap.get(s.topic_id);
+            if (!existing || score > existing.score) {
+              completedSessionsMap.set(s.topic_id, {
+                id: s.id,
+                score,
+                status: "completed"
+              });
+            }
           }
-        }
-      });
+        });
 
-      const mapped = (topicsList || []).map((topic: any) => {
-        const completedSession = completedSessionsMap.get(topic.id);
-        const isCompleted = !!completedSession;
-        return {
-          id: topic.id,
-          name: topic.name,
-          subject: "Mathematics",
-          questions: topic.question_count ?? 0,
-          duration: Math.max(10, Math.ceil((topic.question_count ?? 0) * 1.5)),
-          date: new Date(topic.created_at).toLocaleDateString(),
-          status: isCompleted ? "completed" : "active",
-          score: completedSession ? completedSession.score : undefined
-        };
+        const mapped = (topicsList || []).map((topic: any) => {
+          const completedSession = completedSessionsMap.get(topic.id);
+          const isCompleted = !!completedSession;
+          return {
+            id: topic.id,
+            name: topic.name,
+            subject: "Mathematics",
+            questions: topic.question_count ?? 0,
+            duration: Math.max(10, Math.ceil((topic.question_count ?? 0) * 1.5)),
+            date: new Date(topic.created_at).toLocaleDateString(),
+            status: isCompleted ? "completed" : "active",
+            score: completedSession ? completedSession.score : undefined
+          };
+        });
+        setAssessments(mapped);
+      }).catch((err) => {
+        console.error("Failed to load assessments (topics) from API", err);
       });
-      setAssessments(mapped);
-    }).catch((err) => {
-      console.error("Failed to load assessments (topics) from API", err);
     });
   }, []);
 

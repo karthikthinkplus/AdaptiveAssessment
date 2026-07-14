@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Bell, ChevronDown, Flame, Info, Mail, Menu, PanelLeftClose, Phone, X, Megaphone, UserCheck, BookOpen, ShieldAlert, FileText } from "lucide-react";
+import { Bell, ChevronDown, Info, Mail, Menu, PanelLeftClose, Phone, X, Megaphone, UserCheck, BookOpen, ShieldAlert, FileText } from "lucide-react";
+import { deferEffect } from "@/lib/browserState";
 
 interface TopNavProps {
   userName?: string;
@@ -19,7 +20,7 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    return deferEffect(() => {
       const activeRole = role;
       const targetRoleKey = activeRole === "admin" ? "admin" : `${activeRole}s`;
 
@@ -49,7 +50,7 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
       }));
 
       setNotificationsList(formattedCustom);
-    }
+    });
   }, [role, showNotifications]);
 
   const getNotifIcon = (type: string, important: boolean) => {
@@ -73,16 +74,17 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
   };
 
   const showStreak = role === "student" && title?.toLowerCase().includes("dashboard");
-  const [streakCount, setStreakCount] = useState(0);
+  const [streakCount, setStreakCount] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = sessionStorage.getItem("tp_streak");
+    return saved ? parseInt(saved, 10) : 0;
+  });
 
   useEffect(() => {
     const updateStreak = () => {
-      if (typeof window !== "undefined") {
-        const saved = sessionStorage.getItem("tp_streak");
-        setStreakCount(saved ? parseInt(saved, 10) : 0);
-      }
+      const saved = sessionStorage.getItem("tp_streak");
+      setStreakCount(saved ? parseInt(saved, 10) : 0);
     };
-    updateStreak();
     window.addEventListener("storage", updateStreak);
     return () => window.removeEventListener("storage", updateStreak);
   }, []);
@@ -117,32 +119,16 @@ export default function TopNav({ userName = "Arjun Kumar", userAvatar = "AK", ti
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.45rem",
-              minHeight: 38,
-              padding: "0.35rem 0.7rem 0.35rem 0.45rem",
-              borderRadius: 999,
-              background: "linear-gradient(135deg, #FFF3D6 0%, #FFE1B8 100%)",
-              border: "1px solid rgba(245, 158, 11, 0.35)",
-              boxShadow: "0 8px 18px rgba(245, 158, 11, 0.16)",
-              color: "#9A3412",
+              gap: "0.35rem",
+              minHeight: 36,
+              padding: "0.15rem 0.25rem",
+              color: "var(--primary)",
               fontWeight: 800,
               fontSize: "0.875rem",
               whiteSpace: "nowrap",
             }}
           >
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                background: "linear-gradient(180deg, #FFB000 0%, #FF6B00 55%, #E8194B 100%)",
-                boxShadow: "0 5px 12px rgba(255, 107, 0, 0.28)",
-              }}
-            >
-              <Flame size={18} fill="#FFF7A8" stroke="#FFFFFF" strokeWidth={2.4} />
-            </span>
+            <img src="/streak-icon.png" alt="" aria-hidden="true" className="topnav-streak-icon" />
             <span>{streakCount}</span>
           </div>
         )}

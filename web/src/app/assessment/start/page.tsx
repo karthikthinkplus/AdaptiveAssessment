@@ -5,6 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 
 import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
+import { deferEffect } from "@/lib/browserState";
 
 interface BackendTopic {
   id: string;
@@ -26,30 +27,34 @@ export default function AssessmentStart() {
 
   // Auth guard — redirect to login if not logged in
   useEffect(() => {
-    setMounted(true);
-    const loggedIn = typeof window !== "undefined" && Boolean(sessionStorage.getItem("tp_logged_in"));
-    setAuthChecked(loggedIn);
-    if (!loggedIn) {
-      router.replace("/login?next=assessment");
-    }
+    return deferEffect(() => {
+      setMounted(true);
+      const loggedIn = Boolean(sessionStorage.getItem("tp_logged_in"));
+      setAuthChecked(loggedIn);
+      if (!loggedIn) {
+        router.replace("/login?next=assessment");
+      }
+    });
   }, [router]);
 
   // Load backend topics
   useEffect(() => {
     if (!mounted || !authChecked) return;
-    const fetchTopics = async () => {
-      try {
-        const list = await api.get<BackendTopic[]>("/api/v1/topics");
-        setBackendTopics(list || []);
-        if (!list || list.length === 0) {
+    return deferEffect(() => {
+      const fetchTopics = async () => {
+        try {
+          const list = await api.get<BackendTopic[]>("/api/v1/topics");
+          setBackendTopics(list || []);
+          if (!list || list.length === 0) {
+            setUseMock(true);
+          }
+        } catch (err) {
+          console.error("Backend offline or failed to fetch topics. Falling back to local mock data.", err);
           setUseMock(true);
         }
-      } catch (err) {
-        console.error("Backend offline or failed to fetch topics. Falling back to local mock data.", err);
-        setUseMock(true);
-      }
-    };
-    fetchTopics();
+      };
+      fetchTopics();
+    });
   }, [mounted, authChecked]);
 
   if (!mounted || !authChecked) return null;
@@ -72,7 +77,6 @@ export default function AssessmentStart() {
     } else {
       try {
         // Map selected grade to a backend topic ID
-        let targetTopicId = "";
         const num = grade.replace(/\D/g, ""); // "8", "9", "10"
         
         // 1. Look for difficulty level or name matches

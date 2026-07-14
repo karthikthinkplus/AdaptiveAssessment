@@ -4,25 +4,18 @@ import AppShell from "@/components/layout/AppShell";
 import { FileText, Eye, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { deferEffect, readSessionUser } from "@/lib/browserState";
 
 export default function ReportsListPage() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error] = useState(false);
   const [reportsList, setReportsList] = useState<any[]>([]);
-  const [userName, setUserName] = useState("Student");
-  const [userAvatar, setUserAvatar] = useState("S");
+  const [user] = useState(() => readSessionUser({ name: "Student", avatar: "S", role: "student" }));
 
   const hasReports = reportsList.length > 0;
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "Student");
-        setUserAvatar(user.avatar || "S");
-      }
-
+    return deferEffect(() => {
       api.get<any[]>("/api/v1/topics").then((topicsList) => {
         const topicsMap = new Map((topicsList || []).map(t => [t.id, t.name]));
 
@@ -78,14 +71,14 @@ export default function ReportsListPage() {
         console.error("Failed to fetch topics", err);
         setLoading(false);
       });
-    }
+    });
   }, []);
 
   return (
-    <AppShell role="student" userName={userName} userAvatar={userAvatar} title="Reports">
+    <AppShell role="student" userName={user.name} userAvatar={user.avatar} title="Reports">
 
       {loading ? (
-        /* ── Loading State ─────────────────────────────────────────── */
+        /* -- Loading State ------------------------------------------- */
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5rem 2rem", gap: "1rem" }}>
           <div className="animate-spin" style={{ width: 32, height: 32, border: "3px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%" }} />
           <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)" }}>
@@ -93,7 +86,7 @@ export default function ReportsListPage() {
           </div>
         </div>
       ) : error ? (
-        /* ── Error State ───────────────────────────────────────────── */
+        /* -- Error State --------------------------------------------- */
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5rem 2rem", gap: "1rem", color: "var(--danger)" }}>
           <AlertCircle size={32} />
           <div style={{ fontSize: "0.875rem", fontWeight: 600, textAlign: "center" }}>
@@ -102,7 +95,7 @@ export default function ReportsListPage() {
           </div>
         </div>
       ) : hasReports ? (
-        /* ── Reports Table ─────────────────────────────────────────── */
+        /* -- Reports Table ------------------------------------------- */
         <div className="tp-card animate-fade-in-up" style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
             <table className="tp-table">
@@ -156,7 +149,7 @@ export default function ReportsListPage() {
           </div>
         </div>
       ) : (
-        /* ── Reports Empty State ───────────────────────────────────── */
+        /* -- Reports Empty State ------------------------------------- */
         <div className="tp-card animate-fade-in-up" style={{ maxWidth: 500, margin: "0 auto", padding: "4rem 2rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <FileText size={30} color="var(--primary)" />

@@ -7,6 +7,7 @@ import SimpleBarChart from "@/components/charts/SimpleBarChart";
 import Link from "next/link";
 import { Download, Share2, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
+import { deferEffect } from "@/lib/browserState";
 
 const masteryColor = (m: number) => m >= 0.9 ? "var(--success)" : m >= 0.31 ? "var(--warning)" : "var(--danger)";
 
@@ -46,7 +47,7 @@ export default function DiagnosticReport() {
   const [averageTimePerQuestion, setAverageTimePerQuestion] = useState(72);
   const [abilityTheta, setAbilityTheta] = useState<number>(r.abilityTheta);
   const thetaValue = abilityTheta.toFixed(2);
-  const [dashboardHref, setDashboardHref] = useState("/student/dashboard");
+  const [dashboardHref, setDashboardHref] = useState(getDashboardHref);
   const [topicPerformance, setTopicPerformance] = useState([
     { topic: "Algebra", score: 62 },
     { topic: "Arithmetic", score: 90 },
@@ -68,7 +69,7 @@ export default function DiagnosticReport() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    return deferEffect(() => {
       setDashboardHref(getDashboardHref());
       const isMock = sessionId === "session-001" || sessionId === "session-002" || sessionId === "session-003" || sessionId === "latest";
       const tpUser = sessionStorage.getItem("tp_user");
@@ -191,7 +192,7 @@ export default function DiagnosticReport() {
           loadMockStats();
           // Load mock recent reports
           setRecentReports([
-            { name: "Math Adaptive Test", date: "May 12, 2026", score: overallScore, sessionId: "session-001", subject: "Math" },
+            { name: "Math Adaptive Test", date: "May 12, 2026", score: DIAGNOSTIC_REPORT.overallScore, sessionId: "session-001", subject: "Math" },
             { name: "Number Theory Quiz", date: "Apr 28, 2026", score: 76, sessionId: "session-002", subject: "Math" },
             { name: "Chemistry Practice", date: "May 20, 2026", score: 85, sessionId: "session-003", subject: "Chemistry" }
           ]);
@@ -299,7 +300,7 @@ export default function DiagnosticReport() {
           setAverageTimePerQuestion(sessionId === "session-002" ? 68 : 72);
         }
       }
-    }
+    });
   }, [sessionId]);
 
   return (
@@ -425,7 +426,7 @@ export default function DiagnosticReport() {
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "1.5rem" }}>
 
-        {/* ── Main Unified Report Card ───────────────────────────────── */}
+        {/* -- Main Unified Report Card --------------------------------- */}
         <div className="animate-fade-in-up" style={{
           background: "#ffffff",
           borderRadius: 20,
@@ -548,7 +549,7 @@ export default function DiagnosticReport() {
           </div>
         </div>
 
-        {/* ── Recent Reports ───────────────────────────────────────── */}
+        {/* -- Recent Reports ----------------------------------------- */}
         {recentReports.length > 0 && (
           <div className="animate-fade-in-up stagger-3" style={{ marginTop: "2.5rem" }}>
             <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "#111827", marginBottom: "1rem" }}>Most Recent Reports</div>
@@ -591,7 +592,7 @@ export default function DiagnosticReport() {
 
       </div>
 
-      {/* ── Toast Notifications ────────────────────────────────── */}
+      {/* -- Toast Notifications ---------------------------------- */}
       {toastMessage && (
         <div style={{
           position: "fixed",

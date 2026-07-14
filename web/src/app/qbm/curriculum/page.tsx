@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { deferEffect, readSessionUser } from "@/lib/browserState";
 
 type CurriculumStatus = "Draft" | "Saved" | "Published";
 
@@ -40,15 +41,6 @@ type TopicDependency = {
   status: CurriculumStatus;
 };
 
-
-
-const slugify = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-
 const statusBadgeClass = (status: CurriculumStatus) =>
   status === "Published"
     ? "tp-badge-success"
@@ -68,9 +60,8 @@ export default function QBMCurriculumPage() {
   const [afterTopicId, setAfterTopicId] = useState("");
   const [reason, setReason] = useState("");
   const [notice, setNotice] = useState("Draft curriculum changes are not published until you save and publish them.");
-  const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("QBM Developer");
-  const [userAvatar, setUserAvatar] = useState("RK");
+  const [, setLoading] = useState(true);
+  const [user] = useState(() => readSessionUser({ name: "QBM Developer", avatar: "RK", role: "qbm" }));
 
   const loadData = async () => {
     try {
@@ -124,15 +115,7 @@ export default function QBMCurriculumPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "QBM Developer");
-        setUserAvatar(user.avatar || "RK");
-      }
-    }
-    loadData();
+    return deferEffect(loadData);
   }, []);
 
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0] ?? {
@@ -149,17 +132,6 @@ export default function QBMCurriculumPage() {
     [topics]
   );
   const publishableDependencies = dependencies.filter((dependency) => dependency.status === "Saved");
-  const linkedSavedTopicIds = useMemo(() => {
-    const topicIds = new Set<string>();
-
-    publishableDependencies.forEach((dependency) => {
-      topicIds.add(dependency.beforeTopicId);
-      topicIds.add(dependency.afterTopicId);
-    });
-
-    return topicIds;
-  }, [publishableDependencies]);
-
   const handleSaveTopic = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedName = topicName.trim();
@@ -299,7 +271,7 @@ export default function QBMCurriculumPage() {
 
   return (
     <RouteGuard allowedRoles={["qbm","content_manager"]}>
-    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Curriculum Map">
+    <AppShell role="qbm" userName={user.name} userAvatar={user.avatar} title="Curriculum Map">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: "1.375rem", fontWeight: 700 }}>

@@ -1,9 +1,10 @@
 "use client";
 import RouteGuard from "@/components/auth/RouteGuard";
 import AppShell from "@/components/layout/AppShell";
-import { Search, Trash, Edit, Plus, BookOpen } from "lucide-react";
+import { Search, Trash, Edit, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { deferEffect, readSessionUser } from "@/lib/browserState";
 
 type Difficulty = "very_easy" | "easy" | "medium" | "hard" | "very_hard";
 
@@ -28,16 +29,6 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "very_hard", label: "Very Hard" },
 ];
 
-const difficultyLabel = (difficulty: Difficulty) =>
-  DIFFICULTY_OPTIONS.find(option => option.value === difficulty)?.label || difficulty;
-
-const difficultyBadgeClass = (difficulty: Difficulty) => {
-  const diff = difficulty?.toLowerCase();
-  if (diff === "very_easy" || diff === "easy") return "tp-badge-success";
-  if (diff === "medium") return "tp-badge-warning";
-  return "tp-badge-danger";
-};
-
 export default function QBMQuestionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("");
@@ -45,8 +36,7 @@ export default function QBMQuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [topics, setTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("QBM Developer");
-  const [userAvatar, setUserAvatar] = useState("RK");
+  const [user] = useState(() => readSessionUser({ name: "QBM Developer", avatar: "RK", role: "qbm" }));
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -129,43 +119,37 @@ export default function QBMQuestionsPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "QBM Developer");
-        setUserAvatar(user.avatar || "RK");
-      }
-    }
-    loadData();
+    return deferEffect(loadData);
   }, []);
 
   // Fetch subtopics when the selected topic in the modal changes
   useEffect(() => {
-    if (newTopic) {
-      api.get<any[]>(`/api/v1/topics/${newTopic}/subtopics`)
-        .then(list => {
-          setSubtopics(list || []);
-          if (list && list.length > 0) {
-            // Match subtopic if editing
-            if (editingQuestion && list.some(s => s.id === editingQuestion.subtopic_id)) {
-              setNewSubtopic(editingQuestion.subtopic_id || list[0].id);
+    return deferEffect(() => {
+      if (newTopic) {
+        api.get<any[]>(`/api/v1/topics/${newTopic}/subtopics`)
+          .then(list => {
+            setSubtopics(list || []);
+            if (list && list.length > 0) {
+              // Match subtopic if editing
+              if (editingQuestion && list.some(s => s.id === editingQuestion.subtopic_id)) {
+                setNewSubtopic(editingQuestion.subtopic_id || list[0].id);
+              } else {
+                setNewSubtopic(list[0].id);
+              }
             } else {
-              setNewSubtopic(list[0].id);
+              setNewSubtopic("");
             }
-          } else {
+          })
+          .catch(err => {
+            console.error("Failed to load subtopics", err);
+            setSubtopics([]);
             setNewSubtopic("");
-          }
-        })
-        .catch(err => {
-          console.error("Failed to load subtopics", err);
-          setSubtopics([]);
-          setNewSubtopic("");
-        });
-    } else {
-      setSubtopics([]);
-      setNewSubtopic("");
-    }
+          });
+      } else {
+        setSubtopics([]);
+        setNewSubtopic("");
+      }
+    });
   }, [newTopic, editingQuestion]);
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -237,8 +221,8 @@ export default function QBMQuestionsPage() {
 
   return (
     <RouteGuard allowedRoles={["qbm","content_manager"]}>
-    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="Question Bank Browser">
-      {/* ── Actions Row ────────────────────────────────────────────── */}
+    <AppShell role="qbm" userName={user.name} userAvatar={user.avatar} title="Question Bank Browser">
+      {/* -- Actions Row ---------------------------------------------- */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
         <button 
           onClick={() => {
@@ -264,7 +248,7 @@ export default function QBMQuestionsPage() {
         </button>
       </div>
 
-      {/* ── Filters ─────────────────────────────────────────────────── */}
+      {/* -- Filters --------------------------------------------------- */}
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", alignItems: "center" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: "400px" }}>
           <Search size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
@@ -301,7 +285,7 @@ export default function QBMQuestionsPage() {
         </select>
       </div>
 
-      {/* ── Questions List ───────────────────────────────────────────── */}
+      {/* -- Questions List --------------------------------------------- */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         {loading ? (
           <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
@@ -357,7 +341,7 @@ export default function QBMQuestionsPage() {
         )}
       </div>
 
-      {/* ── Add/Edit Question Modal ──────────────────────────────────────── */}
+      {/* -- Add/Edit Question Modal ---------------------------------------- */}
       {isModalOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div className="animate-scale-in" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", border: "1px solid var(--border)", padding: "1.5rem", boxShadow: "var(--shadow-lg)" }}>

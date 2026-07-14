@@ -130,7 +130,7 @@ export default function AdminNotificationsPage() {
     <RouteGuard allowedRoles={["admin"]}>
     <AppShell role="admin" userName="Ravi Kumar" userAvatar="RK" title="Platform Alerts & Notifications">
       <div className="animate-fade-in-up" style={{ maxWidth: "700px", margin: "0 auto" }}>
-        {/* ── Actions Row ────────────────────────────────────────────── */}
+        {/* -- Actions Row ---------------------------------------------- */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
           <button 
             onClick={() => setIsModalOpen(true)} 
@@ -141,7 +141,7 @@ export default function AdminNotificationsPage() {
           </button>
         </div>
 
-        {/* ── Notifications List ───────────────────────────────────────── */}
+        {/* -- Notifications List ----------------------------------------- */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {notifications.map(n => (
             <div 
@@ -203,7 +203,7 @@ export default function AdminNotificationsPage() {
         </div>
       </div>
 
-      {/* ── Release Notification Modal ─────────────────────────────── */}
+      {/* -- Release Notification Modal ------------------------------- */}
       {isModalOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
           <div className="animate-scale-in" style={{ width: "100%", maxWidth: "450px", background: "#fff", borderRadius: "12px", border: "1px solid var(--border)", padding: "1.5rem", boxShadow: "var(--shadow-lg)" }}>

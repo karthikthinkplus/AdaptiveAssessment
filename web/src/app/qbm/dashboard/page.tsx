@@ -5,6 +5,7 @@ import { BookOpen, AlertCircle, CheckCircle, XCircle, Tag, Plus, Check, X } from
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { deferEffect, readSessionUser } from "@/lib/browserState";
 
 const difficultyBadgeClass = (difficulty: string) => {
   const diff = difficulty?.toLowerCase();
@@ -17,8 +18,7 @@ export default function QBMDashboard() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [topics, setTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("QBM Developer");
-  const [userAvatar, setUserAvatar] = useState("RK");
+  const [user] = useState(() => readSessionUser({ name: "QBM Developer", avatar: "RK", role: "qbm" }));
 
   const loadQuestions = async () => {
     try {
@@ -42,17 +42,11 @@ export default function QBMDashboard() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("current_role", "qbm");
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "QBM Developer");
-        setUserAvatar(user.avatar || "RK");
-      }
-    }
-    loadQuestions();
-    loadTopics();
+    localStorage.setItem("current_role", "qbm");
+    return deferEffect(() => {
+      loadQuestions();
+      loadTopics();
+    });
   }, []);
 
   const handleAction = async (id: string, newStatus: "approved" | "rejected") => {
@@ -72,8 +66,8 @@ export default function QBMDashboard() {
 
   return (
     <RouteGuard allowedRoles={["qbm","content_manager"]}>
-    <AppShell role="qbm" userName={userName} userAvatar={userAvatar} title="QBM Dashboard">
-      {/* ── Action Buttons ────────────────────────────────────────────── */}
+    <AppShell role="qbm" userName={user.name} userAvatar={user.avatar} title="QBM Dashboard">
+      {/* -- Action Buttons ---------------------------------------------- */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", justifyContent: "flex-end" }}>
         <Link href="/qbm/upload" className="tp-btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>
           Bulk Upload
@@ -83,7 +77,7 @@ export default function QBMDashboard() {
         </Link>
       </div>
 
-      {/* ── Stats Row ────────────────────────────────────────────────── */}
+      {/* -- Stats Row -------------------------------------------------- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
         {[
           { label: "Total Questions", value: questions.length, icon: <BookOpen size={18} color="var(--primary)" />, trend: "Active bank size" },
@@ -106,7 +100,7 @@ export default function QBMDashboard() {
         ))}
       </div>
 
-      {/* ── Pending Review Queue ───────────────────────────────────── */}
+      {/* -- Pending Review Queue ------------------------------------- */}
       <div className="tp-card animate-fade-in-up stagger-1">
         <div style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "1rem" }}>Pending Questions Approval Queue ({pendingReviewList.length})</div>
         {loading ? (

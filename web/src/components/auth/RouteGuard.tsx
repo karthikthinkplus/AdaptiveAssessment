@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { deferEffect } from "@/lib/browserState";
 
 type Role = "student" | "teacher" | "qbm" | "content_manager" | "admin";
 
@@ -25,49 +26,31 @@ function getStoredToken(): string | null {
   return sessionStorage.getItem("tp_token");
 }
 
-/**
- * RouteGuard — Centralized RBAC component.
- *
- * Wrap every protected page with this component and specify which roles may access it.
- * - Not logged in  → redirect to /login?next=<current-path>
- * - Wrong role     → redirect to /unauthorized
- * - Correct role   → render children
- *
- * Example usage:
- *   <RouteGuard allowedRoles={["admin"]}>
- *     <AdminDashboard />
- *   </RouteGuard>
- */
 export default function RouteGuard({ children, allowedRoles }: RouteGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [status, setStatus] = useState<"checking" | "allowed" | "denied">("checking");
 
   useEffect(() => {
-    const token = getStoredToken();
-    const user = getStoredUser();
+    return deferEffect(() => {
+      const token = getStoredToken();
+      const user = getStoredUser();
 
-    // Not authenticated at all
-    if (!token || !user) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-      return;
-    }
+      if (!token || !user) {
+        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        return;
+      }
 
-    const userRole = (user.role || "").toLowerCase() as Role;
+      const userRole = (user.role || "").toLowerCase() as Role;
+      const effectiveRole: Role = userRole === "content_manager" ? "qbm" : userRole;
+      const isAllowed = allowedRoles.some((role) => role === effectiveRole || role === userRole);
 
-    // Normalize content_manager → qbm for frontend routing purposes
-    const effectiveRole: Role =
-      userRole === "content_manager" ? "qbm" : userRole;
-
-    const isAllowed = allowedRoles.some(
-      (r) => r === effectiveRole || r === userRole
-    );
-
-    if (isAllowed) {
-      setStatus("allowed");
-    } else {
-      router.replace("/unauthorized");
-    }
+      if (isAllowed) {
+        setStatus("allowed");
+      } else {
+        router.replace("/unauthorized");
+      }
+    });
   }, [pathname, allowedRoles, router]);
 
   if (status === "checking") {
@@ -95,7 +78,7 @@ export default function RouteGuard({ children, allowedRoles }: RouteGuardProps) 
           }}
         />
         <p style={{ color: "#9CA3AF", fontSize: "0.85rem", fontWeight: 600 }}>
-          Verifying access…
+          Verifying access...
         </p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -103,7 +86,7 @@ export default function RouteGuard({ children, allowedRoles }: RouteGuardProps) 
   }
 
   if (status === "denied") {
-    return null; // redirect in progress
+    return null;
   }
 
   return <>{children}</>;

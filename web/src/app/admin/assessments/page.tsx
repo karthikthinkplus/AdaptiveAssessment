@@ -41,7 +41,7 @@ export default function AdminAssessmentsPage() {
     <AppShell title="Platform Assessments">
       <div className="animate-fade-in-up">
 
-        {/* ── Stats Summary Row ────────────────────────────────────────── */}
+        {/* -- Stats Summary Row ------------------------------------------ */}
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
           <div className="tp-stat-card" style={{ flex: 1, maxWidth: "280px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
@@ -70,7 +70,7 @@ export default function AdminAssessmentsPage() {
           </div>
         </div>
 
-        {/* ── Search Bar ─────────────────────────────────────────────── */}
+        {/* -- Search Bar ----------------------------------------------- */}
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1, maxWidth: "400px" }}>
             <Search size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
@@ -85,7 +85,7 @@ export default function AdminAssessmentsPage() {
           </div>
         </div>
 
-        {/* ── Assessments Table ───────────────────────────────────────── */}
+        {/* -- Assessments Table ----------------------------------------- */}
         <div className="tp-card">
           <div style={{ overflowX: "auto" }}>
             <table className="tp-table">

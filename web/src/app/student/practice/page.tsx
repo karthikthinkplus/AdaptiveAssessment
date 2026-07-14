@@ -3,26 +3,15 @@ import RouteGuard from "@/components/auth/RouteGuard";
 
 import AppShell from "@/components/layout/AppShell";
 import PracticeSelector from "@/components/practice/PracticeSelector";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { readSessionUser } from "@/lib/browserState";
 
 export default function StudentPracticePage() {
-  const [userName, setUserName] = useState("Student");
-  const [userAvatar, setUserAvatar] = useState("S");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "Student");
-        setUserAvatar(user.avatar || "S");
-      }
-    }
-  }, []);
+  const [user] = useState(() => readSessionUser({ name: "Student", avatar: "S", role: "student" }));
 
   return (
     <RouteGuard allowedRoles={["student"]}>
-    <AppShell role="student" userName={userName} userAvatar={userAvatar} title="Adaptive Practice">
+    <AppShell role="student" userName={user.name} userAvatar={user.avatar} title="Topic Tests">
       <PracticeSelector role="student" />
     </AppShell>
     </RouteGuard>

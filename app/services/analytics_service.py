@@ -54,3 +54,13 @@ class AnalyticsService:
             "event_type_distribution": event_distribution,
             "navigation_distribution": navigation_distribution,
         }
+
+    def get_admin_dashboard_analytics(self) -> dict:
+        currently_practicing = self.repo.active_practicing_students_count()
+        inactive_three_days = self.repo.inactive_students_count()
+        topic_rates = self.repo.topic_correct_rates()
+        return {
+            "currently_practicing_count": currently_practicing,
+            "inactive_three_days_count": inactive_three_days,
+            "topic_correct_rates": topic_rates,
+        }

@@ -124,7 +124,7 @@ class QuestionUploadService:
     def upload_question_bank(self, content: bytes, created_by) -> UploadSummary:
         dataframe = pd.read_excel(BytesIO(content))
         dataframe = self._map_columns(dataframe)
-        dataframe = dataframe.where(pd.notnull(dataframe), None)
+        dataframe = dataframe.where(pd.notnull(dataframe), None)  # type: ignore
 
         counters = {
             "topics": 0,
@@ -139,7 +139,7 @@ class QuestionUploadService:
         successful_rows = 0
 
         for row_number, row in dataframe.iterrows():
-            excel_row_number = row_number + 2
+            excel_row_number = int(row_number) + 2  # type: ignore
             topic_name = self._clean_text(row.get("topic"))
             subtopic_name = self._clean_text(row.get("subtopic"))
             question_text = self._clean_text(row.get("question_text"))

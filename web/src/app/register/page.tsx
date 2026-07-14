@@ -2,7 +2,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PublicHeader from "@/components/layout/PublicHeader";
 import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -91,17 +90,6 @@ export default function RegisterPage() {
     marginBottom: "0.25rem"
   };
 
-  const selectStyle: React.CSSProperties = {
-    ...inputStyle,
-    appearance: "none",
-    WebkitAppearance: "none",
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23F25AA7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 4px center",
-    paddingRight: "1.5rem",
-    cursor: "pointer"
-  };
-
   return (
     <>
     <div style={{
@@ -119,7 +107,7 @@ export default function RegisterPage() {
       <div style={{ position: "absolute", top: -80, right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(160,137,230,0.15) 0%, transparent 70%)", pointerEvents: "none", zIndex: 1 }} />
       <div style={{ position: "absolute", bottom: -60, left: -60, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, rgba(39,26,88,0.8) 0%, transparent 70%)", pointerEvents: "none", zIndex: 1 }} />
 
-      {/* ── Central Register Card ── */}
+      {/* -- Central Register Card -- */}
       <div className="animate-fade-in-up" style={{
         width: "100%",
         maxWidth: "500px",

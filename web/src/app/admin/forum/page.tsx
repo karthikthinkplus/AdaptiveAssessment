@@ -2,28 +2,39 @@
 import RouteGuard from "@/components/auth/RouteGuard";
 
 import AppShell from "@/components/layout/AppShell";
-import CommunityForum from "@/components/forum/CommunityForum";
-import { useEffect, useState } from "react";
+import CommunityForum, { FORUM_SECTIONS } from "@/components/forum/CommunityForum";
+import { useState } from "react";
+import { readSessionUser } from "@/lib/browserState";
 
 export default function AdminForumPage() {
-  const [userName, setUserName] = useState("Admin");
-  const [userAvatar, setUserAvatar] = useState("AD");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const tpUser = sessionStorage.getItem("tp_user");
-      const user = tpUser ? JSON.parse(tpUser) : null;
-      if (user) {
-        setUserName(user.name || "Admin");
-        setUserAvatar("AD");
-      }
-    }
-  }, []);
+  const [user] = useState(() => readSessionUser({ name: "Admin", avatar: "AD", role: "admin" }));
+  const [activeSectionId, setActiveSectionId] = useState(FORUM_SECTIONS[0].id);
 
   return (
     <RouteGuard allowedRoles={["admin"]}>
-    <AppShell role="admin" userName={userName} userAvatar={userAvatar} title="Community Forum">
-      <CommunityForum role="admin" />
+    <AppShell role="admin" userName={user.name} userAvatar="AD" title="Community Forum">
+      <div className="admin-forum-page">
+        <section className="admin-forum-sections">
+          <div>
+            <h1>Forum Sections</h1>
+            <p>Moderate the farmhouses created for students.</p>
+          </div>
+          <div>
+            {FORUM_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={activeSectionId === section.id ? "active" : ""}
+                onClick={() => setActiveSectionId(section.id)}
+              >
+                <span>{section.icon}</span>
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <CommunityForum role="admin" activeSectionId={activeSectionId} />
+      </div>
     </AppShell>
     </RouteGuard>
   );

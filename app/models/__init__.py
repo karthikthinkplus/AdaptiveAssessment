@@ -1,6 +1,7 @@
 from app.models.adaptive_decision_log import AdaptiveDecisionLog
 from app.models.avatar import Avatar
 from app.models.bkt_state import StudentBKTState
+from app.models.doubt import Doubt
 from app.models.irt_trait import StudentIRTTrait
 from app.models.knowledge_graph import KnowledgeGraphEdge
 from app.models.learning_session import LearningSession

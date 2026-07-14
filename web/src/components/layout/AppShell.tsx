@@ -13,6 +13,9 @@ interface AppShellProps {
   userName?: string;
   userAvatar?: string;
   title?: string;
+  forumSections?: { id: string; label: string; description?: string }[];
+  activeForumSectionId?: string;
+  onForumSectionChange?: (sectionId: string) => void;
 }
 
 const normalizeRole = (role: string): Role => {
@@ -23,7 +26,16 @@ const normalizeRole = (role: string): Role => {
   return "student";
 };
 
-export default function AppShell({ children, role: propRole = "student", userName: propName, userAvatar: propAvatar, title }: AppShellProps) {
+export default function AppShell({
+  children,
+  role: propRole = "student",
+  userName: propName,
+  userAvatar: propAvatar,
+  title,
+  forumSections,
+  activeForumSectionId,
+  onForumSectionChange
+}: AppShellProps) {
   const [sessionUser, setSessionUser] = useState<{ name: string; avatar: string; role: Role } | null>(null);
 
   useEffect(() => {
@@ -77,7 +89,12 @@ export default function AppShell({ children, role: propRole = "student", userNam
 
   return (
     <div className={`tp-app-shell ${sidebarClosed ? "sidebar-closed" : ""}`}>
-      <Sidebar role={activeRole} />
+      <Sidebar
+        role={activeRole}
+        forumSections={forumSections}
+        activeForumSectionId={activeForumSectionId}
+        onForumSectionChange={onForumSectionChange}
+      />
       <main className="tp-main-content">
         <TopNav
           role={activeRole}
